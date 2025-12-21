@@ -8,6 +8,10 @@
 #include <csignal>
 #include <atomic>
 
+// Version and author information
+const std::string VERSION = "1.0.0";
+const std::string AUTHOR = "Luodan <luodan0709@live.cn>";
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -70,6 +74,58 @@ std::string getLastErrorString() {
 }
 #endif
 
+std::string getDetailedErrorDescription(int errorCode) {
+#ifdef _WIN32
+    switch (errorCode) {
+        case WSAECONNREFUSED:
+            return "Connection refused - 目标端口主动拒绝连接";
+        case WSAETIMEDOUT:
+            return "Connection timed out - 连接超时";
+        case WSAEHOSTUNREACH:
+            return "Host unreachable - 主机不可达";
+        case WSAENETUNREACH:
+            return "Network unreachable - 网络不可达";
+        case WSAENETDOWN:
+            return "Network is down - 网络已关闭";
+        case WSAECONNABORTED:
+            return "Connection aborted - 连接被中止";
+        case WSAECONNRESET:
+            return "Connection reset - 连接被重置";
+        case WSAEADDRINUSE:
+            return "Address already in use - 地址已被使用";
+        case WSAEACCES:
+            return "Access denied - 访问被拒绝";
+        default:
+            return GET_ERROR_MSG();
+    }
+#else
+    switch (errorCode) {
+        case ECONNREFUSED:
+            return "Connection refused - 目标端口主动拒绝连接";
+        case ETIMEDOUT:
+            return "Connection timed out - 连接超时";
+        case EHOSTUNREACH:
+            return "Host unreachable - 主机不可达";
+        case ENETUNREACH:
+            return "Network unreachable - 网络不可达";
+        case ENETDOWN:
+            return "Network is down - 网络已关闭";
+        case ECONNABORTED:
+            return "Connection aborted - 连接被中止";
+        case ECONNRESET:
+            return "Connection reset - 连接被重置";
+        case EADDRINUSE:
+            return "Address already in use - 地址已被使用";
+        case EACCES:
+            return "Access denied - 访问被拒绝";
+        case EPERM:
+            return "Operation not permitted - 操作不被允许";
+        default:
+            return strerror(errorCode);
+    }
+#endif
+}
+
 std::string getCurrentTimestamp() {
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
@@ -96,27 +152,41 @@ public:
 #ifdef _WIN32
         SOCKET sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (sockfd == INVALID_SOCKET) {
-            std::cerr << "Error creating socket: " << GET_ERROR_MSG() << std::endl;
+            int errorCode = SOCKET_ERROR_CODE;
+            std::cerr << "Socket creation failed: " << getDetailedErrorDescription(errorCode) << " (Error " << errorCode << ")" << std::endl;
             return false;
         }
 
         // Set socket to non-blocking mode
         u_long mode = 1;
         if (ioctlsocket(sockfd, FIONBIO, &mode) != 0) {
-            std::cerr << "Error setting non-blocking mode: " << GET_ERROR_MSG() << std::endl;
+            int errorCode = SOCKET_ERROR_CODE;
+            std::cerr << "Failed to set non-blocking mode: " << getDetailedErrorDescription(errorCode) << " (Error " << errorCode << ")" << std::endl;
             CLOSE_SOCKET(sockfd);
             return false;
         }
 #else
         int sockfd = socket(AF_INET, SOCK_STREAM, 0);
         if (sockfd < 0) {
-            std::cerr << "Error creating socket: " << GET_ERROR_MSG() << std::endl;
+            int errorCode = SOCKET_ERROR_CODE;
+            std::cerr << "Socket creation failed: " << getDetailedErrorDescription(errorCode) << " (Error " << errorCode << ")" << std::endl;
             return false;
         }
 
         // Set socket to non-blocking mode
         int flags = fcntl(sockfd, F_GETFL, 0);
-        fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
+        if (flags == -1) {
+            int errorCode = SOCKET_ERROR_CODE;
+            std::cerr << "Failed to get socket flags: " << getDetailedErrorDescription(errorCode) << " (Error " << errorCode << ")" << std::endl;
+            CLOSE_SOCKET(sockfd);
+            return false;
+        }
+        if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) == -1) {
+            int errorCode = SOCKET_ERROR_CODE;
+            std::cerr << "Failed to set non-blocking mode: " << getDetailedErrorDescription(errorCode) << " (Error " << errorCode << ")" << std::endl;
+            CLOSE_SOCKET(sockfd);
+            return false;
+        }
 #endif
 
         struct sockaddr_in server_addr;
@@ -125,7 +195,12 @@ public:
         server_addr.sin_port = htons(static_cast<u_short>(port_));
         
         if (inet_pton(AF_INET, host_.c_str(), &server_addr.sin_addr) <= 0) {
-            std::cerr << "Invalid IP address format: " << host_ << std::endl;
+            int errorCode = SOCKET_ERROR_CODE;
+            if (errorCode == 0) {
+                std::cerr << "Invalid IP address format: '" << host_ << "' - 请输入有效的IPv4地址 (例如: 192.168.1.1)" << std::endl;
+            } else {
+                std::cerr << "IP address validation failed: " << getDetailedErrorDescription(errorCode) << " (Error " << errorCode << ")" << std::endl;
+            }
             CLOSE_SOCKET(sockfd);
             return false;
         }
@@ -175,27 +250,27 @@ public:
                     CLOSE_SOCKET(sockfd);
                     return true;
                 } else {
-                    #ifdef _WIN32
-                    char errorBuf[256];
-                    strerror_s(errorBuf, sizeof(errorBuf), so_error);
-                    std::cout << "Connection to " << host_ << ":" << port_ << " failed: " << errorBuf << std::endl;
-#else
-                    std::cout << "Connection to " << host_ << ":" << port_ << " failed: " << strerror(so_error) << std::endl;
-#endif
+                    std::cout << "Connection to " << host_ << ":" << port_ << " failed: " 
+                              << getDetailedErrorDescription(so_error) << " (Error " << so_error << ")" << std::endl;
                     CLOSE_SOCKET(sockfd);
                     return false;
                 }
             } else if (result == 0) {
-                std::cout << "Connection to " << host_ << ":" << port_ << " timed out" << std::endl;
+                std::cout << "Connection to " << host_ << ":" << port_ << " timed out after " 
+                          << timeout_ms << "ms - 连接超时，可能是网络问题或目标主机未响应" << std::endl;
                 CLOSE_SOCKET(sockfd);
                 return false;
             } else {
-                std::cerr << "Select error: " << GET_ERROR_MSG() << std::endl;
+                int errorCode = SOCKET_ERROR_CODE;
+                std::cerr << "Select error: " << getDetailedErrorDescription(errorCode) 
+                          << " (Error " << errorCode << ")" << std::endl;
                 CLOSE_SOCKET(sockfd);
                 return false;
             }
         } else {
-            std::cout << "Connection to " << host_ << ":" << port_ << " failed: " << GET_ERROR_MSG() << std::endl;
+            int errorCode = SOCKET_ERROR_CODE;
+            std::cout << "Connection to " << host_ << ":" << port_ << " failed: " 
+                      << getDetailedErrorDescription(errorCode) << " (Error " << errorCode << ")" << std::endl;
             CLOSE_SOCKET(sockfd);
             return false;
         }
@@ -208,6 +283,7 @@ private:
 
 int main(int argc, char* argv[]) {
     if (argc < 3 || argc > 5) {
+        std::cout << "TCPing v" << VERSION << " by " << AUTHOR << std::endl;
         std::cerr << "Usage: " << argv[0] << " <host> <port> [-i <interval_seconds>]" << std::endl;
         std::cerr << "  -i: Check interval in seconds (default: 1)" << std::endl;
         return 1;
@@ -252,6 +328,7 @@ int main(int argc, char* argv[]) {
 
     Tcping tcping(host, port);
     
+    std::cout << "TCPing v" << VERSION << " by " << AUTHOR << std::endl;
     std::cout << "Starting continuous monitoring of " << host << ":" << port 
               << " with " << interval << "s interval. Press Ctrl+C to stop." << std::endl;
     

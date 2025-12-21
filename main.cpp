@@ -41,7 +41,7 @@ public:
 static WinSockInitializer winSockInit;
 #endif
 
-void signalHandler(int signal) {
+void signalHandler(int /* signal */) {
     keep_running = false;
 }
 
@@ -77,7 +77,13 @@ std::string getCurrentTimestamp() {
         now.time_since_epoch()) % 1000;
     
     std::stringstream ss;
+#ifdef _WIN32
+    struct tm timeinfo;
+    localtime_s(&timeinfo, &time_t);
+    ss << std::put_time(&timeinfo, "%Y-%m-%d %H:%M:%S");
+#else
     ss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
+#endif
     ss << '.' << std::setfill('0') << std::setw(3) << ms.count();
     return ss.str();
 }
@@ -116,7 +122,7 @@ public:
         struct sockaddr_in server_addr;
         memset(&server_addr, 0, sizeof(server_addr));
         server_addr.sin_family = AF_INET;
-        server_addr.sin_port = htons(port_);
+        server_addr.sin_port = htons(static_cast<u_short>(port_));
         
         if (inet_pton(AF_INET, host_.c_str(), &server_addr.sin_addr) <= 0) {
             std::cerr << "Invalid IP address format: " << host_ << std::endl;
@@ -131,7 +137,7 @@ public:
         if (result == 0) {
             auto end_time = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-            if (connection_time_ms) *connection_time_ms = duration.count();
+            if (connection_time_ms) *connection_time_ms = static_cast<int>(duration.count());
             CLOSE_SOCKET(sockfd);
             return true;
         } else if (SOCKET_ERROR_CODE == 
@@ -165,11 +171,17 @@ public:
                 if (so_error == 0) {
                     auto end_time = std::chrono::high_resolution_clock::now();
                     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-                    if (connection_time_ms) *connection_time_ms = duration.count();
+                    if (connection_time_ms) *connection_time_ms = static_cast<int>(duration.count());
                     CLOSE_SOCKET(sockfd);
                     return true;
                 } else {
+                    #ifdef _WIN32
+                    char errorBuf[256];
+                    strerror_s(errorBuf, sizeof(errorBuf), so_error);
+                    std::cout << "Connection to " << host_ << ":" << port_ << " failed: " << errorBuf << std::endl;
+#else
                     std::cout << "Connection to " << host_ << ":" << port_ << " failed: " << strerror(so_error) << std::endl;
+#endif
                     CLOSE_SOCKET(sockfd);
                     return false;
                 }
@@ -211,7 +223,7 @@ int main(int argc, char* argv[]) {
             std::cerr << "Port must be between 1 and 65535" << std::endl;
             return 1;
         }
-    } catch (const std::exception& e) {
+    } catch (const std::exception& /* e */) {
         std::cerr << "Invalid port number: " << argv[2] << std::endl;
         return 1;
     }
@@ -225,7 +237,7 @@ int main(int argc, char* argv[]) {
                     std::cerr << "Interval must be positive" << std::endl;
                     return 1;
                 }
-            } catch (const std::exception& e) {
+            } catch (const std::exception& /* e */) {
                 std::cerr << "Invalid interval value: " << argv[i] << std::endl;
                 return 1;
             }

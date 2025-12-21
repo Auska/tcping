@@ -242,7 +242,7 @@ public:
         timeout.tv_sec = timeout_ms / 1000;
         timeout.tv_usec = (timeout_ms % 1000) * 1000;
 
-        result = select(socket_guard.sockfd + 1, nullptr, &write_fds, &error_fds, &timeout);
+        result = select(static_cast<int>(socket_guard.sockfd) + 1, nullptr, &write_fds, &error_fds, &timeout);
         
         if (result <= 0) {
             if (result == 0) {

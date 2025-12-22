@@ -7,6 +7,7 @@
 #include <sstream>
 #include <csignal>
 #include <atomic>
+#include <netdb.h>
 
 // Version and author information
 const std::string VERSION = "1.0.0";
@@ -200,10 +201,40 @@ public:
         server_addr.sin_family = AF_INET;
         server_addr.sin_port = htons(static_cast<u_short>(port_));
         
-        if (inet_pton(AF_INET, host_.c_str(), &server_addr.sin_addr) <= 0) {
-            if (connection_time_ms) *connection_time_ms = -1;
-            std::cerr << "Invalid IP address format: '" << host_ << "' (请输入有效的IPv4地址，例如: 192.168.1.1)" << std::endl;
-            return false;
+        // First try to parse as IP address
+        if (inet_pton(AF_INET, host_.c_str(), &server_addr.sin_addr) > 0) {
+            // Successfully parsed as IP address, continue with connection
+        } else {
+            // Try to resolve as hostname
+            struct addrinfo hints, *result;
+            memset(&hints, 0, sizeof(hints));
+            hints.ai_family = AF_INET;
+            hints.ai_socktype = SOCK_STREAM;
+            
+            int resolve_result = getaddrinfo(host_.c_str(), nullptr, &hints, &result);
+            if (resolve_result != 0) {
+                if (connection_time_ms) *connection_time_ms = -1;
+                if (error_msg) {
+#ifdef _WIN32
+                    *error_msg = "DNS resolution failed for '" + host_ + "': " + gai_strerrorA(resolve_result) + " (请检查域名是否正确或网络连接)";
+#else
+                    *error_msg = "DNS resolution failed for '" + host_ + "': " + gai_strerror(resolve_result) + " (请检查域名是否正确或网络连接)";
+#endif
+                }
+                return false;
+            }
+            
+            // Copy the resolved IP address
+            struct sockaddr_in* addr_in = (struct sockaddr_in*)result->ai_addr;
+            server_addr.sin_addr = addr_in->sin_addr;
+            
+            // Store the resolved IP for display
+            std::string resolved_ip = inet_ntoa(server_addr.sin_addr);
+            if (resolved_ip != host_) {
+                resolved_host_ = resolved_ip;
+            }
+            
+            freeaddrinfo(result);
         }
 
         // Start connection attempt
@@ -306,9 +337,15 @@ public:
         return false;
     }
 
+public:
+    std::string getResolvedHost() const {
+        return resolved_host_.empty() ? host_ : resolved_host_;
+    }
+
 private:
     std::string host_;
     int port_;
+    std::string resolved_host_;
 };
 
 struct Config {
@@ -359,10 +396,19 @@ private:
     static void printUsage(const char* programName) {
         std::cout << "TCPing v" << VERSION << " by " << AUTHOR << std::endl;
         std::cerr << "Usage: " << programName << " <host> <port> [options]" << std::endl;
+        std::cerr << std::endl;
+        std::cerr << "Arguments:" << std::endl;
+        std::cerr << "  <host>        Target host (IP address or domain name)" << std::endl;
+        std::cerr << "  <port>        Target port (1-65535)" << std::endl;
+        std::cerr << std::endl;
         std::cerr << "Options:" << std::endl;
         std::cerr << "  -i <seconds>  Check interval in seconds (default: 1)" << std::endl;
         std::cerr << "  -t <ms>       Connection timeout in milliseconds (default: 3000)" << std::endl;
         std::cerr << "  -v            Verbose mode (show detailed error messages)" << std::endl;
+        std::cerr << std::endl;
+        std::cerr << "Examples:" << std::endl;
+        std::cerr << "  " << programName << " 192.168.1.1 80" << std::endl;
+        std::cerr << "  " << programName << " google.com 443 -i 2 -t 5000" << std::endl;
     }
 
     static bool parsePort(const char* portStr, int& port) {
@@ -416,9 +462,12 @@ void printStartupInfo(const Config& config) {
 }
 
 void printConnectionResult(const std::string& timestamp, const Config& config, 
-                          bool success, double connectionTime, const std::string& errorMsg = "") {
+                          bool success, double connectionTime, const std::string& errorMsg = "", 
+                          const std::string& resolvedHost = "") {
+    std::string displayHost = resolvedHost.empty() ? config.host : config.host + " (" + resolvedHost + ")";
+    
     if (success) {
-        std::cout << "[" << timestamp << "] " << config.host << ":" << config.port 
+        std::cout << "[" << timestamp << "] " << displayHost << ":" << config.port 
                   << " - Connected (time=";
         if (connectionTime < 1.0) {
             std::cout << std::fixed << std::setprecision(2) << connectionTime << "ms)";
@@ -428,10 +477,10 @@ void printConnectionResult(const std::string& timestamp, const Config& config,
         std::cout << std::endl;
     } else {
         if (!errorMsg.empty()) {
-            std::cout << "[" << timestamp << "] " << config.host << ":" << config.port 
+            std::cout << "[" << timestamp << "] " << displayHost << ":" << config.port 
                       << " - Connection failed: " << errorMsg << std::endl;
         } else {
-            std::cout << "[" << timestamp << "] " << config.host << ":" << config.port 
+            std::cout << "[" << timestamp << "] " << displayHost << ":" << config.port 
                       << " - Connection failed" << std::endl;
         }
     }
@@ -457,7 +506,8 @@ int main(int argc, char* argv[]) {
         bool success = tcping.checkConnection(config.timeout, &connection_time, &error_msg);
         
         std::string timestamp = getCurrentTimestamp();
-        printConnectionResult(timestamp, config, success, connection_time, error_msg);
+        std::string resolved_host = tcping.getResolvedHost();
+        printConnectionResult(timestamp, config, success, connection_time, error_msg, resolved_host);
         
         if (keep_running) {
             std::this_thread::sleep_for(std::chrono::seconds(config.interval));

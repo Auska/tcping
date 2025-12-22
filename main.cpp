@@ -7,7 +7,6 @@
 #include <sstream>
 #include <csignal>
 #include <atomic>
-#include <netdb.h>
 
 // Version and author information
 const std::string VERSION = "1.0.0";
@@ -25,6 +24,7 @@ const std::string AUTHOR = "Luodan <luodan0709@live.cn>";
 #include <unistd.h>
 #include <fcntl.h>
 #include <cerrno>
+#include <netdb.h>
 #endif
 
 std::atomic<bool> keep_running(true);

@@ -5,7 +5,29 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_executable(tcping main.cpp)
+# Source files
+set(SOURCES
+    src/main.cpp
+    src/statistics/statistics.cpp
+    src/error/error.cpp
+    src/args/args.cpp
+    src/tcping/tcping.cpp
+)
+
+# Header files
+set(HEADERS
+    src/include/config.h
+    src/include/statistics.h
+    src/include/error.h
+    src/include/args.h
+    src/include/tcping.h
+    src/include/version.h
+)
+
+add_executable(tcping ${SOURCES} ${HEADERS})
+
+# Include directories
+target_include_directories(tcping PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
 
 # Platform-specific settings
 if(WIN32)

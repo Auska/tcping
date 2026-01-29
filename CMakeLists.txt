@@ -11,7 +11,16 @@ add_executable(tcping main.cpp)
 if(WIN32)
     target_compile_definitions(tcping PRIVATE _WIN32)
     target_link_libraries(tcping ws2_32)
-    target_compile_options(tcping PRIVATE /W4)
+    # Use GCC-style warnings for MinGW, MSVC warnings for MSVC
+    if(MINGW)
+        target_compile_options(tcping PRIVATE
+            -Wall
+            -Wextra
+            -Wpedantic
+        )
+    else()
+        target_compile_options(tcping PRIVATE /W4)
+    endif()
 else()
     target_compile_options(tcping PRIVATE
         -Wall

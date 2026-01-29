@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
 
-    Tcping tcping(config.host, config.port);
+    Tcping tcping(config.host, config.port, config.ipv6);
     Statistics stats;
     
     printStartupInfo(config);

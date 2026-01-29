@@ -44,6 +44,10 @@ bool ArgumentParser::parseArguments(int argc, char* argv[], Config& config) {
             if (!parseCount(argv[++i], config.count)) {
                 return false;
             }
+        } else if (arg == "-6") {
+            config.ipv6 = true;
+        } else if (arg == "-4") {
+            config.ipv6 = false;
         } else {
             std::cerr << "Unknown option: " << arg << std::endl;
             printUsage(argv[0]);
@@ -69,11 +73,15 @@ void ArgumentParser::printUsage(const char* programName) {
     std::cerr << "  -c <count>    Number of connection attempts (default: unlimited)" << std::endl;
     std::cerr << "  -s            Show statistics summary when stopped (default: enabled)" << std::endl;
     std::cerr << "  -S            Hide statistics summary" << std::endl;
+    std::cerr << "  -4            Force IPv4 mode (default)" << std::endl;
+    std::cerr << "  -6            Force IPv6 mode" << std::endl;
     std::cerr << std::endl;
     std::cerr << "Examples:" << std::endl;
     std::cerr << "  " << programName << " 192.168.1.1 80" << std::endl;
     std::cerr << "  " << programName << " google.com 443 -i 2 -t 5000" << std::endl;
     std::cerr << "  " << programName << " 127.0.0.1 22 -c 10" << std::endl;
+    std::cerr << "  " << programName << " ipv6.google.com 443 -6" << std::endl;
+    std::cerr << "  " << programName << " ::1 22 -6" << std::endl;
 }
 
 namespace {

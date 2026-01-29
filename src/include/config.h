@@ -11,6 +11,7 @@ struct Config {
     bool verbose = false;
     bool show_statistics = true;
     int count = 0;
+    bool ipv6 = false;  // Force IPv6 mode
 };
 
 #endif // TCPING_CONFIG_H

@@ -11,7 +11,7 @@ set(SOURCES
     src/statistics/statistics.cpp
     src/error/error.cpp
     src/args/args.cpp
-    src/tcping/tcping.cpp
+    src/tcping.cpp
 )
 
 # Header files

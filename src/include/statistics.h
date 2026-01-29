@@ -2,6 +2,7 @@
 #define TCPING_STATISTICS_H
 
 #include <string>
+#include <limits>
 
 enum class ConnectionState {
     Success,

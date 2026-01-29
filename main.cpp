@@ -740,6 +740,7 @@ int main(int argc, char* argv[]) {
     }
     
     std::cout << "\nMonitoring stopped." << std::endl;
+    std::cout.flush();
     
     // 显示统计信息
     if (config.show_statistics && stats.total_attempts > 0) {

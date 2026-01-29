@@ -7,10 +7,98 @@
 #include <sstream>
 #include <csignal>
 #include <atomic>
+#include <limits>
+#include <algorithm>
 
 // Version and author information
 const std::string VERSION = "1.0.0";
 const std::string AUTHOR = "Luodan <luodan0709@live.cn>";
+
+// Connection state enumeration for better error handling
+enum class ConnectionState {
+    Success,
+    Timeout,
+    Refused,
+    Unreachable,
+    NetworkDown,
+    DnsFailure,
+    ConnectionReset,
+    ConnectionAborted,
+    AddressInUse,
+    AccessDenied,
+    Unknown
+};
+
+// Statistics structure for tracking connection results
+struct Statistics {
+    int total_attempts = 0;
+    int successful_connections = 0;
+    int failed_connections = 0;
+    double min_time = std::numeric_limits<double>::max();
+    double max_time = 0;
+    double total_time = 0;
+    int timeout_count = 0;
+    int refused_count = 0;
+    int unreachable_count = 0;
+    int dns_failure_count = 0;
+
+    void recordAttempt(bool success, double time_ms, ConnectionState state) {
+        total_attempts++;
+        if (success) {
+            successful_connections++;
+            total_time += time_ms;
+            if (time_ms < min_time) min_time = time_ms;
+            if (time_ms > max_time) max_time = time_ms;
+        } else {
+            failed_connections++;
+            switch (state) {
+                case ConnectionState::Timeout:
+                    timeout_count++;
+                    break;
+                case ConnectionState::Refused:
+                    refused_count++;
+                    break;
+                case ConnectionState::Unreachable:
+                    unreachable_count++;
+                    break;
+                case ConnectionState::DnsFailure:
+                    dns_failure_count++;
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    double getAverageTime() const {
+        return successful_connections > 0 ? total_time / successful_connections : 0;
+    }
+
+    double getSuccessRate() const {
+        return total_attempts > 0 ? (successful_connections * 100.0) / total_attempts : 0;
+    }
+
+    void printSummary() const {
+        std::cout << "\n=== Connection Statistics ===" << std::endl;
+        std::cout << "Total attempts:     " << total_attempts << std::endl;
+        std::cout << "Successful:         " << successful_connections 
+                  << " (" << std::fixed << std::setprecision(1) << getSuccessRate() << "%)" << std::endl;
+        std::cout << "Failed:             " << failed_connections << std::endl;
+        if (failed_connections > 0) {
+            std::cout << "  - Timeouts:       " << timeout_count << std::endl;
+            std::cout << "  - Refused:        " << refused_count << std::endl;
+            std::cout << "  - Unreachable:    " << unreachable_count << std::endl;
+            std::cout << "  - DNS failures:   " << dns_failure_count << std::endl;
+        }
+        if (successful_connections > 0) {
+            std::cout << "\nResponse times (ms):" << std::endl;
+            std::cout << "  Min:               " << std::fixed << std::setprecision(2) << min_time << std::endl;
+            std::cout << "  Max:               " << std::fixed << std::setprecision(2) << max_time << std::endl;
+            std::cout << "  Average:           " << std::fixed << std::setprecision(2) << getAverageTime() << std::endl;
+        }
+        std::cout << "===========================\n" << std::endl;
+    }
+};
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -75,6 +163,58 @@ std::string getLastErrorString() {
 }
 #endif
 
+ConnectionState getConnectionState(int errorCode) {
+#ifdef _WIN32
+    switch (errorCode) {
+        case WSAECONNREFUSED:
+            return ConnectionState::Refused;
+        case WSAETIMEDOUT:
+            return ConnectionState::Timeout;
+        case WSAEHOSTUNREACH:
+            return ConnectionState::Unreachable;
+        case WSAENETUNREACH:
+            return ConnectionState::Unreachable;
+        case WSAENETDOWN:
+            return ConnectionState::NetworkDown;
+        case WSAECONNABORTED:
+            return ConnectionState::ConnectionAborted;
+        case WSAECONNRESET:
+            return ConnectionState::ConnectionReset;
+        case WSAEADDRINUSE:
+            return ConnectionState::AddressInUse;
+        case WSAEACCES:
+            return ConnectionState::AccessDenied;
+        default:
+            return ConnectionState::Unknown;
+    }
+#else
+    switch (errorCode) {
+        case ECONNREFUSED:
+            return ConnectionState::Refused;
+        case ETIMEDOUT:
+            return ConnectionState::Timeout;
+        case EHOSTUNREACH:
+            return ConnectionState::Unreachable;
+        case ENETUNREACH:
+            return ConnectionState::Unreachable;
+        case ENETDOWN:
+            return ConnectionState::NetworkDown;
+        case ECONNABORTED:
+            return ConnectionState::ConnectionAborted;
+        case ECONNRESET:
+            return ConnectionState::ConnectionReset;
+        case EADDRINUSE:
+            return ConnectionState::AddressInUse;
+        case EACCES:
+            return ConnectionState::AccessDenied;
+        case EPERM:
+            return ConnectionState::AccessDenied;
+        default:
+            return ConnectionState::Unknown;
+    }
+#endif
+}
+
 std::string getDetailedErrorDescription(int errorCode) {
 #ifdef _WIN32
     switch (errorCode) {
@@ -127,6 +267,33 @@ std::string getDetailedErrorDescription(int errorCode) {
 #endif
 }
 
+std::string getConnectionStateString(ConnectionState state) {
+    switch (state) {
+        case ConnectionState::Success:
+            return "Success";
+        case ConnectionState::Timeout:
+            return "Timeout";
+        case ConnectionState::Refused:
+            return "Connection refused";
+        case ConnectionState::Unreachable:
+            return "Host unreachable";
+        case ConnectionState::NetworkDown:
+            return "Network down";
+        case ConnectionState::DnsFailure:
+            return "DNS resolution failed";
+        case ConnectionState::ConnectionReset:
+            return "Connection reset";
+        case ConnectionState::ConnectionAborted:
+            return "Connection aborted";
+        case ConnectionState::AddressInUse:
+            return "Address in use";
+        case ConnectionState::AccessDenied:
+            return "Access denied";
+        default:
+            return "Unknown error";
+    }
+}
+
 std::string getCurrentTimestamp() {
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
@@ -149,7 +316,7 @@ class Tcping {
 public:
     Tcping(const std::string& host, int port) : host_(host), port_(port) {}
 
-    bool checkConnection(int timeout_ms = 3000, double* connection_time_ms = nullptr, std::string* error_msg = nullptr) {
+    bool checkConnection(int timeout_ms = 3000, double* connection_time_ms = nullptr, std::string* error_msg = nullptr, ConnectionState* connection_state = nullptr) {
         // RAII wrapper for socket
         struct SocketGuard {
 #ifdef _WIN32
@@ -214,6 +381,7 @@ public:
             int resolve_result = getaddrinfo(host_.c_str(), nullptr, &hints, &result);
             if (resolve_result != 0) {
                 if (connection_time_ms) *connection_time_ms = -1;
+                if (connection_state) *connection_state = ConnectionState::DnsFailure;
                 if (error_msg) {
 #ifdef _WIN32
                     *error_msg = "DNS resolution failed for '" + host_ + "': " + gai_strerrorA(resolve_result) + " (请检查域名是否正确或网络连接)";
@@ -256,9 +424,11 @@ public:
 #else
         if (errorCode != EINPROGRESS) {
 #endif
-            std::cout << "Connection to " << host_ << ":" << port_ << " failed: " 
-                      << getDetailedErrorDescription(errorCode) << " (Error " << errorCode << ")" << std::endl;
+            if (connection_state) *connection_state = getConnectionState(errorCode);
             if (connection_time_ms) *connection_time_ms = -1;
+            if (error_msg) {
+                *error_msg = getDetailedErrorDescription(errorCode) + " (Error " + std::to_string(errorCode) + ")";
+            }
             return false;
         }
 
@@ -277,11 +447,13 @@ public:
         
         if (result <= 0) {
             if (result == 0) {
+                if (connection_state) *connection_state = ConnectionState::Timeout;
                 if (error_msg) {
                     *error_msg = "Connection timed out after " + std::to_string(timeout_ms) + "ms";
                 }
             } else {
                 errorCode = SOCKET_ERROR_CODE;
+                if (connection_state) *connection_state = getConnectionState(errorCode);
                 if (error_msg) {
                     *error_msg = getDetailedErrorDescription(errorCode) + " (Error " + std::to_string(errorCode) + ")";
                 }
@@ -295,6 +467,7 @@ public:
             int sock_error = 0;
             socklen_t len = sizeof(sock_error);
             if (getsockopt(socket_guard.sockfd, SOL_SOCKET, SO_ERROR, (char*)&sock_error, &len) == 0) {
+                if (connection_state) *connection_state = getConnectionState(sock_error);
                 if (error_msg) {
                     *error_msg = getDetailedErrorDescription(sock_error) + " (Error " + std::to_string(sock_error) + ")";
                 }
@@ -313,9 +486,11 @@ public:
                     auto end_time = std::chrono::high_resolution_clock::now();
                     auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
                     if (connection_time_ms) *connection_time_ms = duration_us.count() / 1000.0; // 转换为毫秒
+                    if (connection_state) *connection_state = ConnectionState::Success;
                     return true;
                 } else {
                     // Connection failed
+                    if (connection_state) *connection_state = getConnectionState(sock_error);
                     if (error_msg) {
                         *error_msg = getDetailedErrorDescription(sock_error) + " (Error " + std::to_string(sock_error) + ")";
                     }
@@ -324,6 +499,7 @@ public:
                 }
             } else {
                 // getsockopt failed
+                if (connection_state) *connection_state = ConnectionState::Unknown;
                 if (error_msg) {
                     *error_msg = "Failed to get socket error status";
                 }
@@ -333,6 +509,7 @@ public:
         }
 
         // Should not reach here
+        if (connection_state) *connection_state = ConnectionState::Unknown;
         if (connection_time_ms) *connection_time_ms = -1;
         return false;
     }
@@ -354,12 +531,14 @@ struct Config {
     int interval = 1;
     int timeout = 3000;
     bool verbose = false;
+    bool show_statistics = true;  // 默认显示统计信息
+    int count = 0;  // 0 表示无限次，>0 表示连接次数限制
 };
 
 class ArgumentParser {
 public:
     static bool parseArguments(int argc, char* argv[], Config& config) {
-        if (argc < 3 || argc > 7) {
+        if (argc < 3) {
             printUsage(argv[0]);
             return false;
         }
@@ -382,6 +561,14 @@ public:
                 }
             } else if (arg == "-v") {
                 config.verbose = true;
+            } else if (arg == "-s") {
+                config.show_statistics = true;
+            } else if (arg == "-S") {
+                config.show_statistics = false;
+            } else if (arg == "-c" && i + 1 < argc) {
+                if (!parseCount(argv[++i], config.count)) {
+                    return false;
+                }
             } else {
                 std::cerr << "Unknown option: " << arg << std::endl;
                 printUsage(argv[0]);
@@ -405,10 +592,14 @@ private:
         std::cerr << "  -i <seconds>  Check interval in seconds (default: 1)" << std::endl;
         std::cerr << "  -t <ms>       Connection timeout in milliseconds (default: 3000)" << std::endl;
         std::cerr << "  -v            Verbose mode (show detailed error messages)" << std::endl;
+        std::cerr << "  -c <count>    Number of connection attempts (default: unlimited)" << std::endl;
+        std::cerr << "  -s            Show statistics summary when stopped (default: enabled)" << std::endl;
+        std::cerr << "  -S            Hide statistics summary" << std::endl;
         std::cerr << std::endl;
         std::cerr << "Examples:" << std::endl;
         std::cerr << "  " << programName << " 192.168.1.1 80" << std::endl;
         std::cerr << "  " << programName << " google.com 443 -i 2 -t 5000" << std::endl;
+        std::cerr << "  " << programName << " 127.0.0.1 22 -c 10" << std::endl;
     }
 
     static bool parsePort(const char* portStr, int& port) {
@@ -452,13 +643,33 @@ private:
         }
         return true;
     }
+
+    static bool parseCount(const char* countStr, int& count) {
+        try {
+            count = std::stoi(countStr);
+            if (count < 0) {
+                std::cerr << "Count must be non-negative" << std::endl;
+                return false;
+            }
+        } catch (const std::exception& /* e */) {
+            std::cerr << "Invalid count value: " << countStr << std::endl;
+            return false;
+        }
+        return true;
+    }
 };
 
 void printStartupInfo(const Config& config) {
     std::cout << "TCPing v" << VERSION << " by " << AUTHOR << std::endl;
-    std::cout << "Starting continuous monitoring of " << config.host << ":" << config.port 
-              << " with " << config.interval << "s interval and " << config.timeout 
-              << "ms timeout. Press Ctrl+C to stop." << std::endl;
+    if (config.count > 0) {
+        std::cout << "Starting " << config.count << " connection attempts to " << config.host << ":" << config.port 
+                  << " with " << config.interval << "s interval and " << config.timeout 
+                  << "ms timeout. Press Ctrl+C to stop." << std::endl;
+    } else {
+        std::cout << "Starting continuous monitoring of " << config.host << ":" << config.port 
+                  << " with " << config.interval << "s interval and " << config.timeout 
+                  << "ms timeout. Press Ctrl+C to stop." << std::endl;
+    }
 }
 
 void printConnectionResult(const std::string& timestamp, const Config& config, 
@@ -497,23 +708,41 @@ int main(int argc, char* argv[]) {
     signal(SIGTERM, signalHandler);
 
     Tcping tcping(config.host, config.port);
+    Statistics stats;
     
     printStartupInfo(config);
     
+    int attempt_count = 0;
     while (keep_running) {
+        // 检查是否达到指定的连接次数
+        if (config.count > 0 && attempt_count >= config.count) {
+            break;
+        }
+        
         double connection_time = -1.0;
         std::string error_msg;
-        bool success = tcping.checkConnection(config.timeout, &connection_time, &error_msg);
+        ConnectionState connection_state = ConnectionState::Unknown;
+        bool success = tcping.checkConnection(config.timeout, &connection_time, &error_msg, &connection_state);
+        
+        // 记录统计信息
+        stats.recordAttempt(success, connection_time, connection_state);
+        attempt_count++;
         
         std::string timestamp = getCurrentTimestamp();
         std::string resolved_host = tcping.getResolvedHost();
         printConnectionResult(timestamp, config, success, connection_time, error_msg, resolved_host);
         
-        if (keep_running) {
+        if (keep_running && (config.count == 0 || attempt_count < config.count)) {
             std::this_thread::sleep_for(std::chrono::seconds(config.interval));
         }
     }
+    
     std::cout << "\nMonitoring stopped." << std::endl;
+    
+    // 显示统计信息
+    if (config.show_statistics && stats.total_attempts > 0) {
+        stats.printSummary();
+    }
     
     return 0;
 }

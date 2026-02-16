@@ -4,6 +4,11 @@
 #include <string>
 #include <limits>
 
+#ifdef _WIN32
+    #undef max
+    #undef min
+#endif
+
 enum class ConnectionState {
     Success,
     Timeout,

@@ -1,29 +1,8 @@
-#include <iostream>
-#include <string>
-#include <cstring>
-#include <chrono>
-#include <iomanip>
-#include <sstream>
-#include <sys/types.h>
+#include "include/common.h"
 
-#include "tcping.h"
-#include "error.h"
-#include "version.h"
-
-#ifdef _WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <windows.h>
-#else
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <cerrno>
-#include <netdb.h>
-#include <sys/select.h>
-#endif
+#include "include/tcping.h"
+#include "include/error.h"
+#include "include/version.h"
 
 #ifdef _WIN32
 class SocketGuard {

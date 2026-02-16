@@ -1,33 +1,9 @@
-#include <iostream>
-#include <string>
-#include <cstring>
-#include <chrono>
-#include <thread>
-#include <csignal>
-#include <atomic>
-
+#include "include/common.h"
 #include "include/version.h"
 #include "include/config.h"
 #include "include/statistics.h"
 #include "include/args.h"
 #include "include/tcping.h"
-
-#ifdef _WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <windows.h>
-#if defined(_MSC_VER)
-#pragma comment(lib, "ws2_32.lib")
-#endif
-#else
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <cerrno>
-#include <netdb.h>
-#endif
 
 std::atomic<bool> keep_running(true);
 

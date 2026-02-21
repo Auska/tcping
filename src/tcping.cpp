@@ -249,8 +249,18 @@ std::string getCurrentTimestamp() {
 
 void printStartupInfo(const Config& config) {
   std::cout << "TCPing v" << VERSION << " by " << AUTHOR << std::endl;
+
+  // Build port string
+  std::string portStr;
+  for (size_t i = 0; i < config.ports.size(); i++) {
+    if (i > 0) {
+      portStr += ", ";
+    }
+    portStr += std::to_string(config.ports[i]);
+  }
+
   std::cout << "Starting continuous monitoring of " << config.host << ":"
-            << config.port << " with " << config.interval << "s interval and "
+            << portStr << " with " << config.interval << "s interval and "
             << config.timeout << "ms timeout";
   if (config.ipv6) {
     std::cout << " (IPv6)";
@@ -259,13 +269,13 @@ void printStartupInfo(const Config& config) {
   std::cout.flush();
 }
 
-void printConnectionResult(const std::string& timestamp, const Config& config,
-                           bool success, double connectionTime,
-                           const std::string& errorMsg,
-                           const std::string& resolvedHost) {
-  std::cout << "[" << timestamp << "] " << config.host << ":" << config.port;
+void printConnectionResult(const std::string& timestamp,
+                           const std::string& host, int port, bool success,
+                           double connectionTime, const std::string& errorMsg,
+                           const std::string& resolvedHost, bool verbose) {
+  std::cout << "[" << timestamp << "] " << host << ":" << port;
 
-  if (resolvedHost != config.host) {
+  if (resolvedHost != host) {
     std::cout << " (" << resolvedHost << ")";
   }
 
@@ -274,7 +284,7 @@ void printConnectionResult(const std::string& timestamp, const Config& config,
               << connectionTime << "ms)";
   } else {
     std::cout << " - Connection failed";
-    if (config.verbose && !errorMsg.empty()) {
+    if (verbose && !errorMsg.empty()) {
       std::cout << ": " << errorMsg;
     }
   }

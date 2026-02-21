@@ -1,12 +1,14 @@
 #include "args.h"
 #include <cstring>
 #include <iostream>
+#include <sstream>
 #include <string>
+#include <vector>
 #include "version.h"
 
 // Forward declarations for helper functions
 namespace {
-bool parsePort(const char* portStr, int& port);
+bool parsePorts(const char* portStr, std::vector<int>& ports);
 bool parseInterval(const char* intervalStr, int& interval);
 bool parseTimeout(const char* timeoutStr, int& timeout);
 bool parseCount(const char* countStr, int& count);
@@ -20,7 +22,7 @@ bool ArgumentParser::parseArguments(int argc, char* argv[], Config& config) {
 
   config.host = argv[1];
 
-  if (!parsePort(argv[2], config.port)) {
+  if (!parsePorts(argv[2], config.ports)) {
     return false;
   }
 
@@ -66,7 +68,9 @@ void ArgumentParser::printUsage(const char* programName) {
   std::cerr << "Arguments:" << std::endl;
   std::cerr << "  <host>        Target host (IP address or domain name)"
             << std::endl;
-  std::cerr << "  <port>        Target port (1-65535)" << std::endl;
+  std::cerr << "  <port>        Target port(s): single port (80), multiple "
+               "(22,80), or range (100-200)"
+            << std::endl;
   std::cerr << std::endl;
   std::cerr << "Options:" << std::endl;
   std::cerr << "  -i <seconds>  Check interval in seconds (default: 1)"
@@ -96,17 +100,62 @@ void ArgumentParser::printUsage(const char* programName) {
 }
 
 namespace {
-bool parsePort(const char* portStr, int& port) {
-  try {
-    port = std::stoi(portStr);
-    if (port <= 0 || port > 65535) {
-      std::cerr << "Port must be between 1 and 65535" << std::endl;
-      return false;
+bool parsePorts(const char* portStr, std::vector<int>& ports) {
+  std::string str(portStr);
+  std::stringstream ss(str);
+  std::string token;
+
+  while (std::getline(ss, token, ',')) {
+    // Check if it's a range (e.g., "100-200")
+    size_t dashPos = token.find('-');
+    if (dashPos != std::string::npos) {
+      std::string startStr = token.substr(0, dashPos);
+      std::string endStr = token.substr(dashPos + 1);
+
+      try {
+        int startPort = std::stoi(startStr);
+        int endPort = std::stoi(endStr);
+
+        if (startPort <= 0 || startPort > 65535 || endPort <= 0 ||
+            endPort > 65535) {
+          std::cerr << "Port must be between 1 and 65535" << std::endl;
+          return false;
+        }
+
+        if (startPort > endPort) {
+          std::cerr << "Invalid port range: " << startPort << "-" << endPort
+                    << std::endl;
+          return false;
+        }
+
+        for (int p = startPort; p <= endPort; p++) {
+          ports.push_back(p);
+        }
+      } catch (const std::exception& /* e */) {
+        std::cerr << "Invalid port range: " << token << std::endl;
+        return false;
+      }
+    } else {
+      // Single port
+      try {
+        int port = std::stoi(token);
+        if (port <= 0 || port > 65535) {
+          std::cerr << "Port must be between 1 and 65535" << std::endl;
+          return false;
+        }
+        ports.push_back(port);
+      } catch (const std::exception& /* e */) {
+        std::cerr << "Invalid port number: " << token << std::endl;
+        return false;
+      }
     }
-  } catch (const std::exception& /* e */) {
-    std::cerr << "Invalid port number: " << portStr << std::endl;
+  }
+
+  if (ports.empty()) {
+    std::cerr << "At least one port must be specified" << std::endl;
     return false;
   }
+
   return true;
 }
 

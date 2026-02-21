@@ -36,10 +36,9 @@ int main(int argc, char* argv[]) {
   signal(SIGINT, signalHandler);
   signal(SIGTERM, signalHandler);
 
-  Tcping tcping(config.host, config.port, config.ipv6);
-  Statistics stats;
-
   printStartupInfo(config);
+
+  PortStatistics portStats;
 
   int attempt_count = 0;
   while (keep_running) {
@@ -47,19 +46,30 @@ int main(int argc, char* argv[]) {
       break;
     }
 
-    double connection_time = -1.0;
-    std::string error_msg;
-    ConnectionState connection_state = ConnectionState::Unknown;
-    bool success = tcping.checkConnection(config.timeout, &connection_time,
-                                          &error_msg, &connection_state);
+    // Check all ports
+    for (int port : config.ports) {
+      if (!keep_running) {
+        break;
+      }
 
-    stats.recordAttempt(success, connection_time, connection_state);
+      Tcping tcping(config.host, port, config.ipv6);
+
+      double connection_time = -1.0;
+      std::string error_msg;
+      ConnectionState connection_state = ConnectionState::Unknown;
+      bool success = tcping.checkConnection(config.timeout, &connection_time,
+                                            &error_msg, &connection_state);
+
+      portStats.recordAttempt(port, success, connection_time, connection_state);
+
+      std::string timestamp = getCurrentTimestamp();
+      std::string resolved_host = tcping.getResolvedHost();
+      printConnectionResult(timestamp, config.host, port, success,
+                            connection_time, error_msg, resolved_host,
+                            config.verbose);
+    }
+
     attempt_count++;
-
-    std::string timestamp = getCurrentTimestamp();
-    std::string resolved_host = tcping.getResolvedHost();
-    printConnectionResult(timestamp, config, success, connection_time,
-                          error_msg, resolved_host);
 
     if (keep_running && (config.count == 0 || attempt_count < config.count)) {
       std::this_thread::sleep_for(std::chrono::seconds(config.interval));
@@ -69,8 +79,8 @@ int main(int argc, char* argv[]) {
   std::cout << "\nMonitoring stopped." << std::endl;
   std::cout.flush();
 
-  if (config.show_statistics && stats.total_attempts > 0) {
-    stats.printSummary();
+  if (config.show_statistics) {
+    portStats.printSummary();
   }
 
   return 0;

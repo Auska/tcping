@@ -2,6 +2,7 @@
 #define TCPING_STATISTICS_H
 
 #include <limits>
+#include <map>
 #include <string>
 
 #ifdef _WIN32
@@ -38,6 +39,15 @@ struct Statistics {
   void recordAttempt(bool success, double time_ms, ConnectionState state);
   double getAverageTime() const;
   double getSuccessRate() const;
+  void printSummary() const;
+};
+
+// Per-port statistics container
+struct PortStatistics {
+  std::map<int, Statistics> port_stats;
+
+  void recordAttempt(int port, bool success, double time_ms,
+                     ConnectionState state);
   void printSummary() const;
 };
 

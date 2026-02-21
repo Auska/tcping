@@ -67,3 +67,59 @@ void Statistics::printSummary() const {
   }
   std::cout << "===========================\n" << std::endl;
 }
+
+void PortStatistics::recordAttempt(int port, bool success, double time_ms,
+                                   ConnectionState state) {
+  port_stats[port].recordAttempt(success, time_ms, state);
+}
+
+void PortStatistics::printSummary() const {
+  if (port_stats.empty()) {
+    return;
+  }
+
+  std::cout << "\n--- Statistics ---" << std::endl;
+
+  for (const auto& [port, stats] : port_stats) {
+    std::cout << "port " << port << ": " << stats.successful_connections << "/"
+              << stats.total_attempts << " (" << std::fixed
+              << std::setprecision(1) << stats.getSuccessRate() << "%)";
+
+    if (stats.successful_connections > 0) {
+      std::cout << " min=" << std::setprecision(2) << stats.min_time
+                << "ms avg=" << stats.getAverageTime()
+                << "ms max=" << std::setprecision(2) << stats.max_time << "ms";
+    }
+
+    if (stats.failed_connections > 0) {
+      std::cout << " [";
+      bool first = true;
+      if (stats.timeout_count > 0) {
+        std::cout << "timeout=" << stats.timeout_count;
+        first = false;
+      }
+      if (stats.refused_count > 0) {
+        if (!first)
+          std::cout << ", ";
+        std::cout << "refused=" << stats.refused_count;
+        first = false;
+      }
+      if (stats.unreachable_count > 0) {
+        if (!first)
+          std::cout << ", ";
+        std::cout << "unreachable=" << stats.unreachable_count;
+        first = false;
+      }
+      if (stats.dns_failure_count > 0) {
+        if (!first)
+          std::cout << ", ";
+        std::cout << "dns=" << stats.dns_failure_count;
+      }
+      std::cout << "]";
+    }
+
+    std::cout << std::endl;
+  }
+
+  std::cout << "------------------\n" << std::endl;
+}

@@ -22,10 +22,10 @@ private:
 };
 
 void printStartupInfo(const Config& config);
-void printConnectionResult(const std::string& timestamp, const Config& config,
-                           bool success, double connectionTime,
-                           const std::string& errorMsg,
-                           const std::string& resolvedHost);
+void printConnectionResult(const std::string& timestamp,
+                           const std::string& host, int port, bool success,
+                           double connectionTime, const std::string& errorMsg,
+                           const std::string& resolvedHost, bool verbose);
 std::string getCurrentTimestamp();
 
 #endif // TCPING_TCPING_H

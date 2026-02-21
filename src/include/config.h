@@ -2,10 +2,11 @@
 #define TCPING_CONFIG_H
 
 #include <string>
+#include <vector>
 
 struct Config {
   std::string host;
-  int port = 0;
+  std::vector<int> ports;
   int interval = 1;
   int timeout = 3000;
   bool verbose = false;

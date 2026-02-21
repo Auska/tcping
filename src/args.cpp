@@ -12,6 +12,7 @@ bool parsePorts(const char* portStr, std::vector<int>& ports);
 bool parseInterval(const char* intervalStr, int& interval);
 bool parseTimeout(const char* timeoutStr, int& timeout);
 bool parseCount(const char* countStr, int& count);
+bool parseConcurrency(const char* concurrencyStr, int& concurrency);
 } // namespace
 
 bool ArgumentParser::parseArguments(int argc, char* argv[], Config& config) {
@@ -50,6 +51,10 @@ bool ArgumentParser::parseArguments(int argc, char* argv[], Config& config) {
       config.ipv6 = true;
     } else if (arg == "-4") {
       config.ipv6 = false;
+    } else if (arg == "-j" && i + 1 < argc) {
+      if (!parseConcurrency(argv[++i], config.concurrency)) {
+        return false;
+      }
     } else {
       std::cerr << "Unknown option: " << arg << std::endl;
       printUsage(argv[0]);
@@ -89,6 +94,8 @@ void ArgumentParser::printUsage(const char* programName) {
   std::cerr << "  -S            Hide statistics summary" << std::endl;
   std::cerr << "  -4            Force IPv4 mode (default)" << std::endl;
   std::cerr << "  -6            Force IPv6 mode" << std::endl;
+  std::cerr << "  -j <num>      Max concurrent connections (default: 50)"
+            << std::endl;
   std::cerr << std::endl;
   std::cerr << "Examples:" << std::endl;
   std::cerr << "  " << programName << " 192.168.1.1 80" << std::endl;
@@ -196,6 +203,20 @@ bool parseCount(const char* countStr, int& count) {
     }
   } catch (const std::exception& /* e */) {
     std::cerr << "Invalid count value: " << countStr << std::endl;
+    return false;
+  }
+  return true;
+}
+
+bool parseConcurrency(const char* concurrencyStr, int& concurrency) {
+  try {
+    concurrency = std::stoi(concurrencyStr);
+    if (concurrency <= 0) {
+      std::cerr << "Concurrency must be positive" << std::endl;
+      return false;
+    }
+  } catch (const std::exception& /* e */) {
+    std::cerr << "Invalid concurrency value: " << concurrencyStr << std::endl;
     return false;
   }
   return true;

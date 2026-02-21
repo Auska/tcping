@@ -12,7 +12,8 @@ struct Config {
   bool verbose = false;
   bool show_statistics = true;
   int count = 0;
-  bool ipv6 = false; // Force IPv6 mode
+  bool ipv6 = false;    // Force IPv6 mode
+  int concurrency = 50; // Max concurrent connections
 };
 
 #endif // TCPING_CONFIG_H

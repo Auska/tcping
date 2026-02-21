@@ -5,6 +5,11 @@
 #include "include/tcping.h"
 #include "include/version.h"
 
+#include <functional>
+#include <future>
+#include <mutex>
+#include <queue>
+
 std::atomic<bool> keep_running(true);
 
 #ifdef _WIN32
@@ -26,6 +31,64 @@ void signalHandler(int /* signal */) {
   keep_running = false;
 }
 
+// Thread pool for parallel connections
+class ThreadPool {
+public:
+  explicit ThreadPool(size_t threads) : stop_(false) {
+    for (size_t i = 0; i < threads; ++i) {
+      workers_.emplace_back([this] {
+        while (true) {
+          std::function<void()> task;
+          {
+            std::unique_lock<std::mutex> lock(this->queue_mutex_);
+            this->condition_.wait(lock, [this] {
+              return this->stop_.load() || !this->tasks_.empty();
+            });
+            if (this->stop_.load() && this->tasks_.empty()) {
+              return;
+            }
+            task = std::move(this->tasks_.front());
+            this->tasks_.pop();
+          }
+          task();
+        }
+      });
+    }
+  }
+
+  template <class F>
+  auto enqueue(F&& f) -> std::future<std::invoke_result_t<F>> {
+    using return_type = std::invoke_result_t<F>;
+    auto task =
+        std::make_shared<std::packaged_task<return_type()>>(std::forward<F>(f));
+    std::future<return_type> res = task->get_future();
+    {
+      std::unique_lock<std::mutex> lock(queue_mutex_);
+      if (stop_.load()) {
+        throw std::runtime_error("enqueue on stopped ThreadPool");
+      }
+      tasks_.emplace([task]() { (*task)(); });
+    }
+    condition_.notify_one();
+    return res;
+  }
+
+  ~ThreadPool() {
+    stop_.store(true);
+    condition_.notify_all();
+    for (std::thread& worker : workers_) {
+      worker.join();
+    }
+  }
+
+private:
+  std::vector<std::thread> workers_;
+  std::queue<std::function<void()>> tasks_;
+  std::mutex queue_mutex_;
+  std::condition_variable condition_;
+  std::atomic<bool> stop_;
+};
+
 int main(int argc, char* argv[]) {
   Config config;
 
@@ -39,6 +102,12 @@ int main(int argc, char* argv[]) {
   printStartupInfo(config);
 
   PortStatistics portStats;
+  std::mutex stats_mutex;
+  std::mutex output_mutex;
+
+  ThreadPool pool(config.concurrency);
+
+  std::vector<std::future<void>> futures;
 
   int attempt_count = 0;
   while (keep_running) {
@@ -46,28 +115,46 @@ int main(int argc, char* argv[]) {
       break;
     }
 
-    // Check all ports
+    // Check all ports in parallel
     for (int port : config.ports) {
       if (!keep_running) {
         break;
       }
 
-      Tcping tcping(config.host, port, config.ipv6);
+      // Enqueue connection task
+      int port_copy = port; // Capture by value
+      futures.push_back(pool.enqueue([&config, port_copy, &portStats,
+                                      &stats_mutex, &output_mutex]() {
+        Tcping tcping(config.host, port_copy, config.ipv6);
 
-      double connection_time = -1.0;
-      std::string error_msg;
-      ConnectionState connection_state = ConnectionState::Unknown;
-      bool success = tcping.checkConnection(config.timeout, &connection_time,
-                                            &error_msg, &connection_state);
+        double connection_time = -1.0;
+        std::string error_msg;
+        ConnectionState connection_state = ConnectionState::Unknown;
+        bool success = tcping.checkConnection(config.timeout, &connection_time,
+                                              &error_msg, &connection_state);
 
-      portStats.recordAttempt(port, success, connection_time, connection_state);
+        {
+          std::lock_guard<std::mutex> lock(stats_mutex);
+          portStats.recordAttempt(port_copy, success, connection_time,
+                                  connection_state);
+        }
 
-      std::string timestamp = getCurrentTimestamp();
-      std::string resolved_host = tcping.getResolvedHost();
-      printConnectionResult(timestamp, config.host, port, success,
-                            connection_time, error_msg, resolved_host,
-                            config.verbose);
+        std::string timestamp = getCurrentTimestamp();
+        std::string resolved_host = tcping.getResolvedHost();
+        {
+          std::lock_guard<std::mutex> lock(output_mutex);
+          printConnectionResult(timestamp, config.host, port_copy, success,
+                                connection_time, error_msg, resolved_host,
+                                config.verbose);
+        }
+      }));
     }
+
+    // Wait for all ports in this round to complete
+    for (auto& f : futures) {
+      f.wait();
+    }
+    futures.clear();
 
     attempt_count++;
 

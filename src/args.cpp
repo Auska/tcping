@@ -1,4 +1,5 @@
 #include "args.h"
+#include <arpa/inet.h>
 #include <cstring>
 #include <iostream>
 #include <sstream>
@@ -13,6 +14,7 @@ bool parseInterval(const char* intervalStr, int& interval);
 bool parseTimeout(const char* timeoutStr, int& timeout);
 bool parseCount(const char* countStr, int& count);
 bool parseConcurrency(const char* concurrencyStr, int& concurrency);
+bool parseHost(const char* hostStr, std::vector<std::string>& hosts);
 } // namespace
 
 bool ArgumentParser::parseArguments(int argc, char* argv[], Config& config) {
@@ -22,6 +24,9 @@ bool ArgumentParser::parseArguments(int argc, char* argv[], Config& config) {
   }
 
   config.host = argv[1];
+  if (!parseHost(argv[1], config.hosts)) {
+    return false;
+  }
 
   config.ports_str = argv[2];
   if (!parsePorts(argv[2], config.ports)) {
@@ -220,6 +225,130 @@ bool parseConcurrency(const char* concurrencyStr, int& concurrency) {
     std::cerr << "Invalid concurrency value: " << concurrencyStr << std::endl;
     return false;
   }
+  return true;
+}
+
+bool parseHost(const char* hostStr, std::vector<std::string>& hosts) {
+  std::string str(hostStr);
+
+  // Check if it's a CIDR notation (e.g., 192.168.88.0/24)
+  size_t cidrPos = str.find('/');
+  if (cidrPos != std::string::npos) {
+    std::string ipPart = str.substr(0, cidrPos);
+    std::string prefixLenStr = str.substr(cidrPos + 1);
+
+    // Validate IP address
+    struct in_addr addr;
+    if (inet_pton(AF_INET, ipPart.c_str(), &addr) != 1) {
+      std::cerr << "Invalid IP address in CIDR: " << ipPart << std::endl;
+      return false;
+    }
+
+    // Parse prefix length
+    int prefixLen;
+    try {
+      prefixLen = std::stoi(prefixLenStr);
+      if (prefixLen < 0 || prefixLen > 32) {
+        std::cerr << "CIDR prefix must be between 0 and 32" << std::endl;
+        return false;
+      }
+    } catch (const std::exception& /* e */) {
+      std::cerr << "Invalid CIDR prefix: " << prefixLenStr << std::endl;
+      return false;
+    }
+
+    // Calculate IP range from CIDR
+    uint32_t ip = ntohl(addr.s_addr);
+    uint32_t mask = prefixLen == 0 ? 0 : 0xFFFFFFFF << (32 - prefixLen);
+    uint32_t network = ip & mask;
+    uint32_t broadcast = network | (~mask);
+
+    // Limit to reasonable range (max 65536 IPs)
+    if (broadcast - network + 1 > 65536) {
+      std::cerr << "CIDR range too large (max 65536 IPs)" << std::endl;
+      return false;
+    }
+
+    for (uint32_t i = network; i <= broadcast; i++) {
+      struct in_addr tmp;
+      tmp.s_addr = htonl(i);
+      char ipStr[INET_ADDRSTRLEN];
+      inet_ntop(AF_INET, &tmp, ipStr, sizeof(ipStr));
+      hosts.push_back(std::string(ipStr));
+    }
+
+    return true;
+  }
+
+  // Check if it's a range (e.g., 192.168.88.100-200)
+  size_t dashPos = str.find('-');
+  if (dashPos != std::string::npos) {
+    std::string ipPart = str.substr(0, dashPos);
+    std::string endPart = str.substr(dashPos + 1);
+
+    // Validate base IP address
+    struct in_addr addr;
+    if (inet_pton(AF_INET, ipPart.c_str(), &addr) != 1) {
+      std::cerr << "Invalid IP address: " << ipPart << std::endl;
+      return false;
+    }
+
+    uint32_t baseIp = ntohl(addr.s_addr);
+    // Get first 3 octets as base prefix
+    uint32_t basePrefix = (baseIp >> 8) & 0xFFFFFF; // First 3 octets
+
+    // Parse end IP (could be full IP or just last octet)
+    uint32_t endIp;
+    if (endPart.find('.') != std::string::npos) {
+      // Full IP address
+      struct in_addr endAddr;
+      if (inet_pton(AF_INET, endPart.c_str(), &endAddr) != 1) {
+        std::cerr << "Invalid end IP address: " << endPart << std::endl;
+        return false;
+      }
+      endIp = ntohl(endAddr.s_addr);
+    } else {
+      // Just last octet
+      try {
+        int lastOctet = std::stoi(endPart);
+        if (lastOctet < 0 || lastOctet > 255) {
+          std::cerr << "Invalid last octet: " << lastOctet << std::endl;
+          return false;
+        }
+        endIp = (basePrefix << 8) | (lastOctet & 0xFF);
+      } catch (const std::exception& /* e */) {
+        std::cerr << "Invalid IP range: " << str << std::endl;
+        return false;
+      }
+    }
+
+    uint32_t startIp = baseIp;
+
+    // Validate range
+    if (endIp < startIp) {
+      std::cerr << "Invalid IP range: start > end" << std::endl;
+      return false;
+    }
+
+    // Limit to reasonable range (max 65536 IPs)
+    if (endIp - startIp + 1 > 65536) {
+      std::cerr << "IP range too large (max 65536 IPs)" << std::endl;
+      return false;
+    }
+
+    for (uint32_t i = startIp; i <= endIp; i++) {
+      struct in_addr tmp;
+      tmp.s_addr = htonl(i);
+      char ipStr[INET_ADDRSTRLEN];
+      inet_ntop(AF_INET, &tmp, ipStr, sizeof(ipStr));
+      hosts.push_back(std::string(ipStr));
+    }
+
+    return true;
+  }
+
+  // Plain IP address or domain name - just pass through
+  hosts.push_back(str);
   return true;
 }
 } // namespace

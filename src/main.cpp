@@ -115,47 +115,55 @@ int main(int argc, char* argv[]) {
       break;
     }
 
-    // Resolve DNS once per round
-    std::string resolved_ip = resolveHost(config.host, config.ipv6);
-
-    // Check all ports in parallel
-    for (int port : config.ports) {
+    // Check all hosts and ports in parallel
+    for (const std::string& current_host : config.hosts) {
       if (!keep_running) {
         break;
       }
 
-      // Enqueue connection task
-      int port_copy = port;
-      std::string resolved_copy = resolved_ip;
-      futures.push_back(pool.enqueue([&config, port_copy, resolved_copy,
+      // Resolve DNS once per round (for domains)
+      std::string resolved_ip = resolveHost(current_host, config.ipv6);
+
+      // Check all ports in parallel
+      for (int port : config.ports) {
+        if (!keep_running) {
+          break;
+        }
+
+        // Enqueue connection task
+        int port_copy = port;
+        std::string host_copy = current_host;
+        std::string resolved_copy = resolved_ip;
+        futures.push_back(pool.enqueue([&config, host_copy, port_copy, resolved_copy,
                                       &portStats, &stats_mutex,
                                       &output_mutex]() {
-        Tcping tcping(resolved_copy, port_copy, config.ipv6);
+          Tcping tcping(resolved_copy, port_copy, config.ipv6);
 
-        double connection_time = -1.0;
-        std::string error_msg;
-        ConnectionState connection_state = ConnectionState::Unknown;
-        bool success = tcping.checkConnection(config.timeout, &connection_time,
+          double connection_time = -1.0;
+          std::string error_msg;
+          ConnectionState connection_state = ConnectionState::Unknown;
+          bool success = tcping.checkConnection(config.timeout, &connection_time,
                                               &error_msg, &connection_state);
 
-        {
-          std::lock_guard<std::mutex> lock(stats_mutex);
-          portStats.recordAttempt(port_copy, success, connection_time,
+          {
+            std::lock_guard<std::mutex> lock(stats_mutex);
+            portStats.recordAttempt(port_copy, success, connection_time,
                                   connection_state);
-        }
+          }
 
-        std::string timestamp = getCurrentTimestamp();
-        std::string resolved_host = tcping.getResolvedHost();
-        {
-          std::lock_guard<std::mutex> lock(output_mutex);
-          printConnectionResult(timestamp, config.host, port_copy, success,
+          std::string timestamp = getCurrentTimestamp();
+          std::string resolved_host = tcping.getResolvedHost();
+          {
+            std::lock_guard<std::mutex> lock(output_mutex);
+            printConnectionResult(timestamp, host_copy, port_copy, success,
                                 connection_time, error_msg, resolved_host,
                                 config.verbose);
-        }
-      }));
+          }
+        }));
+      }
     }
 
-    // Wait for all ports in this round to complete
+    // Wait for all tasks in this round to complete
     for (auto& f : futures) {
       f.wait();
     }

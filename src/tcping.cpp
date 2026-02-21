@@ -278,7 +278,12 @@ std::string resolveHost(const std::string& host, bool ipv6) {
 void printStartupInfo(const Config& config) {
   std::cout << "TCPing v" << VERSION << " by " << AUTHOR << std::endl;
 
-  std::cout << "Starting continuous monitoring of " << config.host << ":"
+  std::string host_display = config.host;
+  if (config.hosts.size() > 1) {
+    host_display = config.host + " (" + std::to_string(config.hosts.size()) + " hosts)";
+  }
+
+  std::cout << "Starting continuous monitoring of " << host_display << ":"
             << config.ports_str << " with " << config.interval
             << "s interval and " << config.timeout << "ms timeout";
   if (config.ipv6) {

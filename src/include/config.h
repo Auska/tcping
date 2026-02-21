@@ -5,7 +5,8 @@
 #include <vector>
 
 struct Config {
-  std::string host;
+  std::string host;                  // Original host input (could be IP, CIDR, range, or domain)
+  std::vector<std::string> hosts;    // Expanded IP addresses from CIDR/range
   std::vector<int> ports;
   std::string ports_str; // Original port string (e.g., "80-100")
   int interval = 1;

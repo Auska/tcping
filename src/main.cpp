@@ -115,6 +115,9 @@ int main(int argc, char* argv[]) {
       break;
     }
 
+    // Resolve DNS once per round
+    std::string resolved_ip = resolveHost(config.host, config.ipv6);
+
     // Check all ports in parallel
     for (int port : config.ports) {
       if (!keep_running) {
@@ -122,10 +125,12 @@ int main(int argc, char* argv[]) {
       }
 
       // Enqueue connection task
-      int port_copy = port; // Capture by value
-      futures.push_back(pool.enqueue([&config, port_copy, &portStats,
-                                      &stats_mutex, &output_mutex]() {
-        Tcping tcping(config.host, port_copy, config.ipv6);
+      int port_copy = port;
+      std::string resolved_copy = resolved_ip;
+      futures.push_back(pool.enqueue([&config, port_copy, resolved_copy,
+                                      &portStats, &stats_mutex,
+                                      &output_mutex]() {
+        Tcping tcping(resolved_copy, port_copy, config.ipv6);
 
         double connection_time = -1.0;
         std::string error_msg;

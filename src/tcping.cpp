@@ -247,6 +247,34 @@ std::string getCurrentTimestamp() {
   return oss.str();
 }
 
+std::string resolveHost(const std::string& host, bool ipv6) {
+  struct addrinfo hints, *result;
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = ipv6 ? AF_INET6 : AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+
+  int status = getaddrinfo(host.c_str(), nullptr, &hints, &result);
+  if (status != 0) {
+    return host;
+  }
+
+  char ipstr[INET6_ADDRSTRLEN];
+  void* addr;
+
+  if (result->ai_family == AF_INET) {
+    struct sockaddr_in* ipv4 = (struct sockaddr_in*)result->ai_addr;
+    addr = &(ipv4->sin_addr);
+  } else {
+    struct sockaddr_in6* ipv6_addr = (struct sockaddr_in6*)result->ai_addr;
+    addr = &(ipv6_addr->sin6_addr);
+  }
+
+  inet_ntop(result->ai_family, addr, ipstr, sizeof(ipstr));
+  std::string resolved = std::string(ipstr);
+  freeaddrinfo(result);
+  return resolved;
+}
+
 void printStartupInfo(const Config& config) {
   std::cout << "TCPing v" << VERSION << " by " << AUTHOR << std::endl;
 

@@ -28,4 +28,7 @@ void printConnectionResult(const std::string& timestamp,
                            const std::string& resolvedHost, bool verbose);
 std::string getCurrentTimestamp();
 
+// Resolve host to IP address (DNS lookup)
+std::string resolveHost(const std::string& host, bool ipv6);
+
 #endif // TCPING_TCPING_H

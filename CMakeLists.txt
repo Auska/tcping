@@ -8,9 +8,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Source files
 set(SOURCES
     src/main.cpp
-    src/statistics/statistics.cpp
-    src/error/error.cpp
-    src/args/args.cpp
+    src/statistics.cpp
+    src/error.cpp
+    src/args.cpp
     src/tcping.cpp
 )
 

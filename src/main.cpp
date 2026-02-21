@@ -179,7 +179,8 @@ int main(int argc, char* argv[]) {
   std::cout << "\nMonitoring stopped." << std::endl;
   std::cout.flush();
 
-  if (config.show_statistics) {
+  // Only show statistics when scanning multiple hosts or ports
+  if (config.hosts.size() > 1 || config.ports.size() > 1) {
     portStats.printSummary();
   }
 

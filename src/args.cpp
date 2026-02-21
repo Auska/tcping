@@ -45,10 +45,6 @@ bool ArgumentParser::parseArguments(int argc, char* argv[], Config& config) {
       }
     } else if (arg == "-v") {
       config.verbose = true;
-    } else if (arg == "-s") {
-      config.show_statistics = true;
-    } else if (arg == "-S") {
-      config.show_statistics = false;
     } else if (arg == "-c" && i + 1 < argc) {
       if (!parseCount(argv[++i], config.count)) {
         return false;
@@ -91,20 +87,18 @@ void ArgumentParser::printUsage(const char* programName) {
       << std::endl;
   std::cerr << "  -v            Verbose mode (show detailed error messages)"
             << std::endl;
-  std::cerr
-      << "  -c <count>    Number of connection attempts (default: unlimited)"
-      << std::endl;
-  std::cerr << "  -s            Show statistics summary when stopped (default: "
-               "enabled)"
+  std::cerr << "  -c <count>    Number of connection attempts (default: unlimited)"
             << std::endl;
-  std::cerr << "  -S            Hide statistics summary" << std::endl;
   std::cerr << "  -4            Force IPv4 mode (default)" << std::endl;
   std::cerr << "  -6            Force IPv6 mode" << std::endl;
   std::cerr << "  -j <num>      Max concurrent connections (default: 50)"
             << std::endl;
   std::cerr << std::endl;
+  std::cerr << "Notes:" << std::endl;
+  std::cerr << "  Statistics are automatically shown when scanning multiple hosts "
+               "or ports" << std::endl;
+  std::cerr << std::endl;
   std::cerr << "Examples:" << std::endl;
-  std::cerr << "  " << programName << " 192.168.1.1 80" << std::endl;
   std::cerr << "  " << programName << " google.com 443 -i 2 -t 5000"
             << std::endl;
   std::cerr << "  " << programName << " 127.0.0.1 22 -c 10" << std::endl;

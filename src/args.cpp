@@ -1,5 +1,5 @@
 #include "args.h"
-#include <arpa/inet.h>
+#include "common.h"
 #include <cstring>
 #include <iostream>
 #include <sstream>

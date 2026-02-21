@@ -23,6 +23,7 @@ bool ArgumentParser::parseArguments(int argc, char* argv[], Config& config) {
 
   config.host = argv[1];
 
+  config.ports_str = argv[2];
   if (!parsePorts(argv[2], config.ports)) {
     return false;
   }

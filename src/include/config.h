@@ -7,6 +7,7 @@
 struct Config {
   std::string host;
   std::vector<int> ports;
+  std::string ports_str; // Original port string (e.g., "80-100")
   int interval = 1;
   int timeout = 3000;
   bool verbose = false;

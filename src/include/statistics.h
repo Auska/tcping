@@ -45,10 +45,13 @@ struct Statistics {
 // Per-port statistics container
 struct PortStatistics {
   std::map<int, Statistics> port_stats;
+  std::map<std::string, Statistics> host_stats;
 
   void recordAttempt(int port, bool success, double time_ms,
                      ConnectionState state);
-  void printSummary() const;
+  void recordHostAttempt(const std::string& host, int port, bool success,
+                         double time_ms, ConnectionState state);
+  void printSummary(bool show_all = false) const;
 };
 
 #endif // TCPING_STATISTICS_H

@@ -134,21 +134,21 @@ int main(int argc, char* argv[]) {
         int port_copy = port;
         std::string host_copy = current_host;
         std::string resolved_copy = resolved_ip;
-        futures.push_back(pool.enqueue([&config, host_copy, port_copy, resolved_copy,
-                                      &portStats, &stats_mutex,
-                                      &output_mutex]() {
+        futures.push_back(pool.enqueue([&config, host_copy, port_copy,
+                                        resolved_copy, &portStats, &stats_mutex,
+                                        &output_mutex]() {
           Tcping tcping(resolved_copy, port_copy, config.ipv6);
 
           double connection_time = -1.0;
           std::string error_msg;
           ConnectionState connection_state = ConnectionState::Unknown;
-          bool success = tcping.checkConnection(config.timeout, &connection_time,
-                                              &error_msg, &connection_state);
+          bool success = tcping.checkConnection(
+              config.timeout, &connection_time, &error_msg, &connection_state);
 
           {
             std::lock_guard<std::mutex> lock(stats_mutex);
-            portStats.recordAttempt(port_copy, success, connection_time,
-                                  connection_state);
+            portStats.recordHostAttempt(host_copy, port_copy, success,
+                                        connection_time, connection_state);
           }
 
           std::string timestamp = getCurrentTimestamp();
@@ -156,8 +156,8 @@ int main(int argc, char* argv[]) {
           {
             std::lock_guard<std::mutex> lock(output_mutex);
             printConnectionResult(timestamp, host_copy, port_copy, success,
-                                connection_time, error_msg, resolved_host,
-                                config.verbose);
+                                  connection_time, error_msg, resolved_host,
+                                  config.verbose);
           }
         }));
       }
@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
 
   // Only show statistics when scanning multiple hosts or ports
   if (config.hosts.size() > 1 || config.ports.size() > 1) {
-    portStats.printSummary();
+    portStats.printSummary(config.show_all);
   }
 
   return 0;

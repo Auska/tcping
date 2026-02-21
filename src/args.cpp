@@ -53,6 +53,8 @@ bool ArgumentParser::parseArguments(int argc, char* argv[], Config& config) {
       config.ipv6 = true;
     } else if (arg == "-4") {
       config.ipv6 = false;
+    } else if (arg == "-a") {
+      config.show_all = true;
     } else if (arg == "-j" && i + 1 < argc) {
       if (!parseConcurrency(argv[++i], config.concurrency)) {
         return false;
@@ -80,23 +82,30 @@ void ArgumentParser::printUsage(const char* programName) {
             << std::endl;
   std::cerr << std::endl;
   std::cerr << "Options:" << std::endl;
-  std::cerr << "  -i <seconds>  Check interval in seconds (default: 1)"
-            << std::endl;
+  std::cerr
+      << "  -i <seconds>  Wait interval between checks in seconds (default: 1)"
+      << std::endl;
   std::cerr
       << "  -t <ms>       Connection timeout in milliseconds (default: 3000)"
       << std::endl;
   std::cerr << "  -v            Verbose mode (show detailed error messages)"
             << std::endl;
-  std::cerr << "  -c <count>    Number of connection attempts (default: unlimited)"
-            << std::endl;
+  std::cerr
+      << "  -c <count>    Number of connection attempts (default: unlimited)"
+      << std::endl;
+  std::cerr
+      << "  -a            Show all statistics (default: only show open ports)"
+      << std::endl;
   std::cerr << "  -4            Force IPv4 mode (default)" << std::endl;
   std::cerr << "  -6            Force IPv6 mode" << std::endl;
   std::cerr << "  -j <num>      Max concurrent connections (default: 50)"
             << std::endl;
   std::cerr << std::endl;
   std::cerr << "Notes:" << std::endl;
-  std::cerr << "  Statistics are automatically shown when scanning multiple hosts "
-               "or ports" << std::endl;
+  std::cerr
+      << "  Statistics are automatically shown when scanning multiple hosts "
+         "or ports"
+      << std::endl;
   std::cerr << std::endl;
   std::cerr << "Examples:" << std::endl;
   std::cerr << "  " << programName << " google.com 443 -i 2 -t 5000"

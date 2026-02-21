@@ -280,7 +280,8 @@ void printStartupInfo(const Config& config) {
 
   std::string host_display = config.host;
   if (config.hosts.size() > 1) {
-    host_display = config.host + " (" + std::to_string(config.hosts.size()) + " hosts)";
+    host_display =
+        config.host + " (" + std::to_string(config.hosts.size()) + " hosts)";
   }
 
   std::cout << "Starting continuous monitoring of " << host_display << ":"

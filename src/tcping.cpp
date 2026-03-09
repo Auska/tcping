@@ -75,6 +75,11 @@ Tcping::Tcping(const std::string& host, int port, bool ipv6)
   freeaddrinfo(result);
 }
 
+// 接受已解析IP的构造函数 - 避免重复DNS解析
+Tcping::Tcping(const std::string& host, int port, const std::string& resolved_ip,
+               bool ipv6)
+    : host_(host), port_(port), resolved_host_(resolved_ip), ipv6_(ipv6) {}
+
 bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
                              std::string* error_msg,
                              ConnectionState* connection_state) {
@@ -85,8 +90,10 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
   hints.ai_family = ipv6_ ? AF_INET6 : AF_INET;
   hints.ai_socktype = SOCK_STREAM;
 
-  int status = getaddrinfo(host_.c_str(), std::to_string(port_).c_str(), &hints,
-                           &result);
+  // 使用已解析的IP地址，避免重复DNS解析
+  const std::string& target_host = resolved_host_.empty() ? host_ : resolved_host_;
+  int status = getaddrinfo(target_host.c_str(), std::to_string(port_).c_str(),
+                           &hints, &result);
   if (status != 0) {
     if (error_msg)
       *error_msg = "DNS resolution failed";
@@ -170,13 +177,8 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
   FD_ZERO(&write_fds);
   FD_ZERO(&except_fds);
 
-#ifdef _WIN32
   FD_SET(sockfd, &write_fds);
   FD_SET(sockfd, &except_fds);
-#else
-  FD_SET(sockfd, &write_fds);
-  FD_SET(sockfd, &except_fds);
-#endif
 
   struct timeval tv;
   tv.tv_sec = timeout_ms / 1000;

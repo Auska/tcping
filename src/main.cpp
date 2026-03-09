@@ -10,7 +10,7 @@
 #include <mutex>
 #include <queue>
 
-std::atomic<bool> keep_running(true);
+std::sig_atomic_t keep_running(true);
 
 #ifdef _WIN32
 class WinSockInitializer {
@@ -28,7 +28,7 @@ static WinSockInitializer winSockInit;
 #endif
 
 void signalHandler(int /* signal */) {
-  keep_running = false;
+  keep_running = 0;
 }
 
 // Thread pool for parallel connections
@@ -137,7 +137,8 @@ int main(int argc, char* argv[]) {
         futures.push_back(pool.enqueue([&config, host_copy, port_copy,
                                         resolved_copy, &portStats, &stats_mutex,
                                         &output_mutex]() {
-          Tcping tcping(resolved_copy, port_copy, config.ipv6);
+          // 使用已解析的IP地址构造Tcping对象，避免重复DNS解析
+          Tcping tcping(host_copy, port_copy, resolved_copy, config.ipv6);
 
           double connection_time = -1.0;
           std::string error_msg;

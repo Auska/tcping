@@ -8,6 +8,9 @@
 class Tcping {
 public:
   Tcping(const std::string& host, int port, bool ipv6 = false);
+  // 接受已解析的IP地址，避免重复DNS解析
+  Tcping(const std::string& host, int port, const std::string& resolved_ip,
+         bool ipv6 = false);
   bool checkConnection(int timeout_ms = 3000,
                        double* connection_time_ms = nullptr,
                        std::string* error_msg = nullptr,

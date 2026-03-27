@@ -130,15 +130,10 @@ int main(int argc, char* argv[]) {
           break;
         }
 
-        // Enqueue connection task
-        int port_copy = port;
-        std::string host_copy = current_host;
-        std::string resolved_copy = resolved_ip;
-        futures.push_back(pool.enqueue([&config, host_copy, port_copy,
-                                        resolved_copy, &portStats, &stats_mutex,
+        futures.push_back(pool.enqueue([&config, current_host, port, resolved_ip,
+                                        &portStats, &stats_mutex,
                                         &output_mutex]() {
-          // 使用已解析的IP地址构造Tcping对象，避免重复DNS解析
-          Tcping tcping(host_copy, port_copy, resolved_copy, config.ipv6);
+          Tcping tcping(current_host, port, resolved_ip, config.ipv6);
 
           double connection_time = -1.0;
           std::string error_msg;
@@ -148,7 +143,7 @@ int main(int argc, char* argv[]) {
 
           {
             std::lock_guard<std::mutex> lock(stats_mutex);
-            portStats.recordHostAttempt(host_copy, port_copy, success,
+            portStats.recordHostAttempt(current_host, port, success,
                                         connection_time, connection_state);
           }
 
@@ -156,7 +151,7 @@ int main(int argc, char* argv[]) {
           std::string resolved_host = tcping.getResolvedHost();
           {
             std::lock_guard<std::mutex> lock(output_mutex);
-            printConnectionResult(timestamp, host_copy, port_copy, success,
+            printConnectionResult(timestamp, current_host, port, success,
                                   connection_time, error_msg, resolved_host,
                                   config.verbose);
           }

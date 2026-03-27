@@ -1,14 +1,14 @@
 #ifndef TCPING_TCPING_H
 #define TCPING_TCPING_H
 
-#include <string>
+#include "common.h"
 #include "config.h"
 #include "statistics.h"
+#include <string>
 
 class Tcping {
 public:
   Tcping(const std::string& host, int port, bool ipv6 = false);
-  // 接受已解析的IP地址，避免重复DNS解析
   Tcping(const std::string& host, int port, const std::string& resolved_ip,
          bool ipv6 = false);
   bool checkConnection(int timeout_ms = 3000,
@@ -18,10 +18,15 @@ public:
   std::string getResolvedHost() const;
 
 private:
+  bool resolveAndCache(const std::string& target);
   std::string host_;
   int port_;
   std::string resolved_host_;
   bool ipv6_ = false;
+  bool cached_ = false;
+  struct sockaddr_storage cached_addr_;
+  socklen_t cached_addrlen_ = 0;
+  int cached_family_ = 0;
 };
 
 void printStartupInfo(const Config& config);
@@ -30,8 +35,6 @@ void printConnectionResult(const std::string& timestamp,
                            double connectionTime, const std::string& errorMsg,
                            const std::string& resolvedHost, bool verbose);
 std::string getCurrentTimestamp();
-
-// Resolve host to IP address (DNS lookup)
 std::string resolveHost(const std::string& host, bool ipv6);
 
 #endif // TCPING_TCPING_H

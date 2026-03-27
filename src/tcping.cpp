@@ -44,57 +44,65 @@ private:
 };
 #endif
 
-Tcping::Tcping(const std::string& host, int port, bool ipv6)
-    : host_(host), port_(port), ipv6_(ipv6) {
-  struct addrinfo hints, *result;
-  memset(&hints, 0, sizeof(hints));
-  hints.ai_family = ipv6 ? AF_INET6 : AF_INET;
-  hints.ai_socktype = SOCK_STREAM;
-
-  int status =
-      getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &result);
-  if (status != 0) {
-    resolved_host_ = host_;
-    return;
-  }
-
+namespace {
+std::string addrinfoToIPString(struct addrinfo* result) {
   char ipstr[INET6_ADDRSTRLEN];
   void* addr;
 
   if (result->ai_family == AF_INET) {
-    struct sockaddr_in* ipv4 = (struct sockaddr_in*)result->ai_addr;
+    auto* ipv4 = reinterpret_cast<struct sockaddr_in*>(result->ai_addr);
     addr = &(ipv4->sin_addr);
   } else {
-    struct sockaddr_in6* ipv6 = (struct sockaddr_in6*)result->ai_addr;
+    auto* ipv6 = reinterpret_cast<struct sockaddr_in6*>(result->ai_addr);
     addr = &(ipv6->sin6_addr);
   }
 
   inet_ntop(result->ai_family, addr, ipstr, sizeof(ipstr));
-  resolved_host_ = std::string(ipstr);
+  return std::string(ipstr);
+}
+} // namespace
+
+bool Tcping::resolveAndCache(const std::string& target) {
+  struct addrinfo hints{}, *result;
+  hints.ai_family = ipv6_ ? AF_INET6 : AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+
+  int status =
+      getaddrinfo(target.c_str(), std::to_string(port_).c_str(), &hints, &result);
+  if (status != 0) {
+    cached_ = false;
+    return false;
+  }
+
+  resolved_host_ = addrinfoToIPString(result);
+  memcpy(&cached_addr_, result->ai_addr, result->ai_addrlen);
+  cached_addrlen_ = result->ai_addrlen;
+  cached_family_ = result->ai_family;
+  cached_ = true;
 
   freeaddrinfo(result);
+  return true;
 }
 
-// 接受已解析IP的构造函数 - 避免重复DNS解析
+Tcping::Tcping(const std::string& host, int port, bool ipv6)
+    : host_(host), port_(port), ipv6_(ipv6) {
+  if (!resolveAndCache(host)) {
+    resolved_host_ = host_;
+  }
+}
+
 Tcping::Tcping(const std::string& host, int port, const std::string& resolved_ip,
                bool ipv6)
-    : host_(host), port_(port), resolved_host_(resolved_ip), ipv6_(ipv6) {}
+    : host_(host), port_(port), resolved_host_(resolved_ip), ipv6_(ipv6) {
+  resolveAndCache(resolved_ip);
+}
 
 bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
                              std::string* error_msg,
                              ConnectionState* connection_state) {
   auto start_time = std::chrono::high_resolution_clock::now();
 
-  struct addrinfo hints, *result;
-  memset(&hints, 0, sizeof(hints));
-  hints.ai_family = ipv6_ ? AF_INET6 : AF_INET;
-  hints.ai_socktype = SOCK_STREAM;
-
-  // 使用已解析的IP地址，避免重复DNS解析
-  const std::string& target_host = resolved_host_.empty() ? host_ : resolved_host_;
-  int status = getaddrinfo(target_host.c_str(), std::to_string(port_).c_str(),
-                           &hints, &result);
-  if (status != 0) {
+  if (!cached_) {
     if (error_msg)
       *error_msg = "DNS resolution failed";
     if (connection_state)
@@ -103,10 +111,8 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
   }
 
 #ifdef _WIN32
-  SOCKET sockfd =
-      socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+  SOCKET sockfd = socket(cached_family_, SOCK_STREAM, 0);
   if (sockfd == INVALID_SOCKET) {
-    freeaddrinfo(result);
     if (error_msg)
       *error_msg = "Failed to create socket";
     if (connection_state)
@@ -114,10 +120,8 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
     return false;
   }
 #else
-  int sockfd =
-      socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+  int sockfd = socket(cached_family_, SOCK_STREAM, 0);
   if (sockfd < 0) {
-    freeaddrinfo(result);
     if (error_msg)
       *error_msg = "Failed to create socket";
     if (connection_state)
@@ -136,9 +140,10 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
   fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
 #endif
 
-  status = connect(sockfd, result->ai_addr, result->ai_addrlen);
+  int ret =
+      connect(sockfd, (struct sockaddr*)&cached_addr_, cached_addrlen_);
 
-  if (status == 0) {
+  if (ret == 0) {
     auto end_time = std::chrono::high_resolution_clock::now();
     double elapsed =
         std::chrono::duration<double, std::milli>(end_time - start_time)
@@ -147,14 +152,12 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
       *connection_time_ms = elapsed;
     if (connection_state)
       *connection_state = ConnectionState::Success;
-    freeaddrinfo(result);
     return true;
   }
 
 #ifdef _WIN32
   int error_code = WSAGetLastError();
   if (error_code != WSAEWOULDBLOCK) {
-    freeaddrinfo(result);
     if (error_msg)
       *error_msg = getDetailedErrorDescription(error_code);
     if (connection_state)
@@ -164,7 +167,6 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
 #else
   if (errno != EINPROGRESS) {
     int error_code = errno;
-    freeaddrinfo(result);
     if (error_msg)
       *error_msg = getDetailedErrorDescription(error_code);
     if (connection_state)
@@ -173,27 +175,23 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
   }
 #endif
 
-  fd_set write_fds, except_fds;
+  fd_set write_fds;
   FD_ZERO(&write_fds);
-  FD_ZERO(&except_fds);
-
   FD_SET(sockfd, &write_fds);
-  FD_SET(sockfd, &except_fds);
 
   struct timeval tv;
   tv.tv_sec = timeout_ms / 1000;
   tv.tv_usec = (timeout_ms % 1000) * 1000;
 
-  status = select(
+  ret = select(
 #ifdef _WIN32
       0,
 #else
       sockfd + 1,
 #endif
-      nullptr, &write_fds, &except_fds, &tv);
+      nullptr, &write_fds, nullptr, &tv);
 
-  if (status <= 0) {
-    freeaddrinfo(result);
+  if (ret <= 0) {
     if (error_msg)
       *error_msg = "Connection timed out";
     if (connection_state)
@@ -203,9 +201,20 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
 
   int error = 0;
   socklen_t len = sizeof(error);
-  if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, (char*)&error, &len) < 0 ||
-      error != 0) {
-    freeaddrinfo(result);
+  if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, (char*)&error, &len) < 0) {
+#ifdef _WIN32
+    int sys_err = WSAGetLastError();
+#else
+    int sys_err = errno;
+#endif
+    if (error_msg)
+      *error_msg = getDetailedErrorDescription(sys_err);
+    if (connection_state)
+      *connection_state = getConnectionState(sys_err);
+    return false;
+  }
+
+  if (error != 0) {
     if (error_msg)
       *error_msg = getDetailedErrorDescription(error);
     if (connection_state)
@@ -220,8 +229,6 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
     *connection_time_ms = elapsed;
   if (connection_state)
     *connection_state = ConnectionState::Success;
-
-  freeaddrinfo(result);
   return true;
 }
 
@@ -250,8 +257,7 @@ std::string getCurrentTimestamp() {
 }
 
 std::string resolveHost(const std::string& host, bool ipv6) {
-  struct addrinfo hints, *result;
-  memset(&hints, 0, sizeof(hints));
+  struct addrinfo hints{}, *result;
   hints.ai_family = ipv6 ? AF_INET6 : AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
 
@@ -260,19 +266,7 @@ std::string resolveHost(const std::string& host, bool ipv6) {
     return host;
   }
 
-  char ipstr[INET6_ADDRSTRLEN];
-  void* addr;
-
-  if (result->ai_family == AF_INET) {
-    struct sockaddr_in* ipv4 = (struct sockaddr_in*)result->ai_addr;
-    addr = &(ipv4->sin_addr);
-  } else {
-    struct sockaddr_in6* ipv6_addr = (struct sockaddr_in6*)result->ai_addr;
-    addr = &(ipv6_addr->sin6_addr);
-  }
-
-  inet_ntop(result->ai_family, addr, ipstr, sizeof(ipstr));
-  std::string resolved = std::string(ipstr);
+  std::string resolved = addrinfoToIPString(result);
   freeaddrinfo(result);
   return resolved;
 }
@@ -293,7 +287,6 @@ void printStartupInfo(const Config& config) {
     std::cout << " (IPv6)";
   }
   std::cout << ". Press Ctrl+C to stop." << std::endl;
-  std::cout.flush();
 }
 
 void printConnectionResult(const std::string& timestamp,
@@ -317,5 +310,4 @@ void printConnectionResult(const std::string& timestamp,
   }
 
   std::cout << std::endl;
-  std::cout.flush();
 }

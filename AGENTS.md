@@ -35,7 +35,27 @@ TCPing是一个用C++23开发的TCP端口持续监控工具，用于检查远程
 - **按端口统计**：自动按端口统计连接结果
 - **详细模式**：可选的详细输出模式
 
-## 构建说明
+## 开发者指南
+
+### 常用命令
+```bash
+# 构建（Linux/Unix）
+mkdir -p build && cd build && cmake .. && make
+
+# 交叉编译Windows版本（Linux上）
+mkdir -p build-win && cd build-win && cmake .. -DCMAKE_TOOLCHAIN_FILE=../mingw-toolchain.cmake && make
+
+# 代码格式化
+clang-format -i src/*.cpp src/include/*.h
+
+# 运行
+./build/tcping <host> <port> [options]
+```
+
+### 项目状态
+- **无测试基础设施**：项目当前没有单元测试、CTest配置或CI/CD流水线
+- **无静态分析配置**：没有clang-tidy或其他静态分析工具配置
+- **唯一代码质量工具**：`.clang-format`（需手动运行）
 
 ### 依赖要求
 - CMake 3.20或更高版本
@@ -268,41 +288,61 @@ tcping/
         └── statistics.h    # 统计结构体
 ```
 
-## 架构改进
+## 代码架构
 
-### 代码结构优化
-- **Config结构体**：集中管理配置参数
-- **ArgumentParser类**：模块化参数解析逻辑
-- **Tcping类**：封装网络连接和DNS解析功能
-- **SocketGuard类**：RAII模式管理socket资源
-- **Statistics类**：独立的统计管理和输出功能
-- **ThreadPool类**：线程池实现，支持并发连接
-- **功能分离**：将显示逻辑与核心功能分离
+### 模块概览
+| 模块 | 头文件 | 源文件 | 说明 |
+|------|--------|--------|------|
+| Config | `config.h` | - | 纯数据结构，集中管理所有配置参数 |
+| ArgumentParser | `args.h` | `args.cpp` | 全静态类，解析命令行参数填充Config |
+| Tcping | `tcping.h` | `tcping.cpp` | TCP连接核心，含SocketGuard RAII类和DNS解析 |
+| Statistics | `statistics.h` | `statistics.cpp` | 连接统计管理，按主机和端口双重维度统计 |
+| Error | `error.h` | `error.cpp` | 平台错误码到ConnectionState枚举的映射及双语错误描述 |
+| ThreadPool | `main.cpp` | `main.cpp` | 线程池实现，**内联在main.cpp中**，非独立文件 |
+| SocketGuard | `tcping.cpp` | `tcping.cpp` | socket RAII包装，**内联在tcping.cpp中**，非独立文件 |
 
-### 网络连接优化
-- **非阻塞连接**：使用非阻塞socket避免长时间阻塞
-- **select()超时控制**：精确的连接超时控制
-- **DNS域名解析**：使用getaddrinfo实现域名到IP的转换
-- **IP地址回显**：显示解析后的IP地址，便于确认目标
-- **IPv6支持**：完整的IPv6协议栈支持
-- **错误检测改进**：更准确的连接状态检测
-- **资源管理**：自动资源清理，防止资源泄露
+### 运行时数据流
+```
+ArgumentParser::parseArguments()  →  Config
+    ↓
+主循环（main.cpp）
+    ├── resolveHost()           ← DNS解析在主线程完成，结果传给工作线程
+    ├── ThreadPool::enqueue()   ← 对每个 (host, port) 组合提交任务
+    │       ↓（工作线程内）
+    │   Tcping(host, port, resolved_ip)  →  checkConnection()
+    │       ↓
+    │   PortStatistics::recordHostAttempt()  ← 记录结果（双重维度）
+    │   printConnectionResult()              ← 实时输出
+    │
+    └── 循环结束后 → PortStatistics::printSummary(show_all)
+```
 
-### 统计功能优化
-- **按主机统计**：分别统计每个IP的连接结果
-- **按端口统计**：分别统计每个端口的连接结果
-- **智能显示**：默认只显示有成功连接的统计
-- **全部显示**：-a参数可显示所有主机的统计
+### 线程模型
+- **ThreadPool**（`main.cpp:35-90`）：经典C++线程池，使用`std::mutex` + `condition_variable`
+- **线程数量** = `config.concurrency`（默认50），同时等于最大并发连接数
+- **每轮（round）同步**：对所有 host×port 组合提交任务，等待全部`std::future`完成后进入下一轮
+- **两个互斥锁**：`stats_mutex`保护统计数据，`output_mutex`保护控制台输出，减少锁竞争
+- **DNS解析串行化**：`resolveHost()`在主线程调用，避免并发DNS问题；工作线程接收已解析的IP字符串
 
-### 代码优化
-- **公共头文件**：创建common.h集中管理公共头文件，减少重复包含
-- **const正确性**：确保成员函数正确使用const修饰符
+### 跨平台模式
+- **条件编译**：`#ifdef _WIN32` 分叉Windows/Unix代码路径
+- **平台宏**（`common.h`）：`CLOSE_SOCKET`、`SOCKET_TYPE`、`SOCKET_ERROR_CODE`等统一接口
+- **Windows特有**：`WinSockInitializer`类（静态全局变量，`main()`前自动初始化WSA）
+- **`ConnectionState`枚举**（`statistics.h`）：跨平台的连接状态抽象，被`error.cpp`和`statistics.cpp`共同依赖
 
-### 跨平台兼容性
-- **条件编译**：使用预处理指令区分平台特定代码
-- **统一接口**：定义平台无关的宏（CLOSE_SOCKET, SOCKET_ERROR_CODE）
-- **错误信息本地化**：Windows和Unix使用不同的错误获取机制
-- **MinGW支持**：提供交叉编译工具链配置文件
+## 代码风格
+项目使用 `.clang-format` 配置（基于Google风格变体），关键规则：
+- **列宽**：80字符
+- **缩进**：2空格，不使用Tab
+- **指针对齐**：左对齐（`int* p`）
+- **大括号**：K&R风格（`Attach`）
+- **单行限制**：不允许单行if/loop/block
+- **排序**：`#include`自动排序
+
+提交代码前运行 `clang-format -i src/*.cpp src/include/*.h` 确保格式一致。
+
+## 已知技术债务
+- `common.h` 未列入 `CMakeLists.txt` 的 `HEADERS` 变量，不影响编译但影响IDE文件追踪
 
 ## 平台支持
 

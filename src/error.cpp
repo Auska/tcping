@@ -1,16 +1,5 @@
 #include "error.h"
-#include <cstring>
-#include <string>
-
-#ifdef _WIN32
-#  include <windows.h>
-#  include <winsock2.h>
-#else
-#  include <arpa/inet.h>
-#  include <netdb.h>
-#  include <netinet/in.h>
-#  include <sys/socket.h>
-#endif
+#include "common.h"
 
 ConnectionState getConnectionState(int errorCode) {
 #ifdef _WIN32

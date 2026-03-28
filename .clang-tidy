@@ -1,0 +1,88 @@
+---
+# clang-tidy 配置文件
+# 基于 C++23 标准和现代最佳实践
+
+Language: Cpp
+Standard: c++23
+
+# 启用的检查组
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  cppcoreguidelines-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-avoid-c-arrays,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-type-vararg,
+  -modernize-avoid-c-arrays,
+  -readability-function-size,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -cert-err58-cpp
+
+# 警告作为错误（可选，可根据需要调整）
+WarningsAsErrors: ''
+
+# 头文件过滤
+HeaderFilterRegex: '.*'
+
+# 检查选项
+CheckOptions:
+  # 命名约定
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: camelBack
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.ConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.ParameterCase
+    value: lower_case
+  - key: readability-identifier-naming.EnumConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.MemberCase
+    value: lower_case
+  - key: readability-identifier-naming.PrivateMemberSuffix
+    value: '_'
+  - key: readability-identifier-naming.ProtectedMemberSuffix
+    value: '_'
+  - key: readability-identifier-naming.GlobalConstantCase
+    value: UPPER_CASE
+
+  # 现代化选项
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
+  - key: modernize-loop-convert.MinConfidence
+    value: reasonable
+  - key: modernize-pass-by-value.IncludeStyle
+    value: google
+
+  # 可读性选项
+  - key: readability-braces-around-statements.ShortStatementLines
+    value: '1'
+  - key: readability-simplify-boolean-expr.ChainedConditionalReturn
+    value: 'true'
+  - key: readability-simplify-boolean-expr.ChainedConditionalAssignment
+    value: 'true'
+
+  # 性能选项
+  - key: performance-unnecessary-value-param.AllowedTypes
+    value: ''
+
+  # 安全性选项
+  - key: cert-dcl21-cpp.Pedantic
+    value: 'false'

@@ -67,8 +67,8 @@ bool Tcping::resolveAndCache(const std::string& target) {
   hints.ai_family = ipv6_ ? AF_INET6 : AF_INET;
   hints.ai_socktype = SOCK_STREAM;
 
-  int status =
-      getaddrinfo(target.c_str(), std::to_string(port_).c_str(), &hints, &result);
+  int status = getaddrinfo(target.c_str(), std::to_string(port_).c_str(),
+                           &hints, &result);
   if (status != 0) {
     cached_ = false;
     return false;
@@ -91,8 +91,8 @@ Tcping::Tcping(const std::string& host, int port, bool ipv6)
   }
 }
 
-Tcping::Tcping(const std::string& host, int port, const std::string& resolved_ip,
-               bool ipv6)
+Tcping::Tcping(const std::string& host, int port,
+               const std::string& resolved_ip, bool ipv6)
     : host_(host), port_(port), resolved_host_(resolved_ip), ipv6_(ipv6) {
   resolveAndCache(resolved_ip);
 }
@@ -140,8 +140,7 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
   fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
 #endif
 
-  int ret =
-      connect(sockfd, (struct sockaddr*)&cached_addr_, cached_addrlen_);
+  int ret = connect(sockfd, (struct sockaddr*)&cached_addr_, cached_addrlen_);
 
   if (ret == 0) {
     auto end_time = std::chrono::high_resolution_clock::now();

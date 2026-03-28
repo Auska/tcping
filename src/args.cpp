@@ -1,10 +1,10 @@
 #include "args.h"
-#include "common.h"
 #include <cstring>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
+#include "common.h"
 #include "version.h"
 
 // Forward declarations for helper functions

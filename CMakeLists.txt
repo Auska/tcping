@@ -5,6 +5,9 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Export compile commands for clang-tidy
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Source files (excluding main.cpp for library)
 set(LIB_SOURCES
     src/statistics.cpp
@@ -64,14 +67,17 @@ option(BUILD_TESTS "Build tests" ON)
 if(BUILD_TESTS)
     # Create test executable with amalgamated Catch2
     add_executable(tests
-        src/catch_amalgamated.cpp
+        external/catch_amalgamated.cpp
         src/tests/test_args.cpp
         src/tests/test_statistics.cpp
         src/tests/test_error.cpp
         src/tests/test_tcping.cpp
     )
 
-    target_include_directories(tests PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
+    target_include_directories(tests PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/include
+        ${CMAKE_SOURCE_DIR}/external
+    )
     target_link_libraries(tests PRIVATE tcping_lib)
 
     # Enable CTest

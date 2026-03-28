@@ -130,8 +130,8 @@ int main(int argc, char* argv[]) {
           break;
         }
 
-        futures.push_back(pool.enqueue([&config, current_host, port, resolved_ip,
-                                        &portStats, &stats_mutex,
+        futures.push_back(pool.enqueue([&config, current_host, port,
+                                        resolved_ip, &portStats, &stats_mutex,
                                         &output_mutex]() {
           Tcping tcping(current_host, port, resolved_ip, config.ipv6);
 

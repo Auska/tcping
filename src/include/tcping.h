@@ -1,10 +1,10 @@
 #ifndef TCPING_TCPING_H
 #define TCPING_TCPING_H
 
+#include <string>
 #include "common.h"
 #include "config.h"
 #include "statistics.h"
-#include <string>
 
 class Tcping {
 public:

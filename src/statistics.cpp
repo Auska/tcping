@@ -12,8 +12,8 @@ void printStatsEntry(const std::string& label, const Statistics& stats,
 
   if (stats.successful_connections > 0) {
     std::cout << " min=" << std::setprecision(2) << stats.min_time
-              << "ms avg=" << stats.getAverageTime() << "ms max="
-              << std::setprecision(2) << stats.max_time << "ms";
+              << "ms avg=" << stats.getAverageTime()
+              << "ms max=" << std::setprecision(2) << stats.max_time << "ms";
   }
 
   if (stats.failed_connections > 0 && show_all) {

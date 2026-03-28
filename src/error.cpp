@@ -3,7 +3,7 @@
 
 auto getConnectionState(int error_code) -> ConnectionState {
 #ifdef _WIN32
-  switch (errorCode) {
+  switch (error_code) {
     case WSAECONNREFUSED:
       return ConnectionState::Refused;
     case WSAETIMEDOUT:
@@ -55,7 +55,7 @@ auto getConnectionState(int error_code) -> ConnectionState {
 
 auto getDetailedErrorDescription(int error_code) -> std::string {
 #ifdef _WIN32
-  switch (errorCode) {
+  switch (error_code) {
     case WSAECONNREFUSED:
       return "Connection refused (目标端口主动拒绝连接)";
     case WSAETIMEDOUT:

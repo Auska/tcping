@@ -81,7 +81,7 @@ auto Tcping::resolveAndCache(const std::string& target) -> bool {
 
   resolved_host_ = addrinfoToIPString(result);
   memcpy(&cached_addr_, result->ai_addr, result->ai_addrlen);
-  cached_addrlen_ = result->ai_addrlen;
+  cached_addrlen_ = static_cast<socklen_t>(result->ai_addrlen);
   cached_family_ = result->ai_family;
   cached_ = true;
 
@@ -193,7 +193,7 @@ auto Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
 
   struct timeval tv{};
   tv.tv_sec = timeout_ms / 1000;
-  tv.tv_usec = static_cast<__suseconds_t>((timeout_ms % 1000) * 1000);
+  tv.tv_usec = static_cast<long>((timeout_ms % 1000) * 1000);
 
   ret = select(
 #ifdef _WIN32

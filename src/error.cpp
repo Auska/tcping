@@ -1,7 +1,7 @@
 #include "error.h"
 #include "common.h"
 
-ConnectionState getConnectionState(int errorCode) {
+auto getConnectionState(int error_code) -> ConnectionState {
 #ifdef _WIN32
   switch (errorCode) {
     case WSAECONNREFUSED:
@@ -26,7 +26,7 @@ ConnectionState getConnectionState(int errorCode) {
       return ConnectionState::Unknown;
   }
 #else
-  switch (errorCode) {
+  switch (error_code) {
     case ECONNREFUSED:
       return ConnectionState::Refused;
     case ETIMEDOUT:
@@ -53,7 +53,7 @@ ConnectionState getConnectionState(int errorCode) {
 #endif
 }
 
-std::string getDetailedErrorDescription(int errorCode) {
+auto getDetailedErrorDescription(int error_code) -> std::string {
 #ifdef _WIN32
   switch (errorCode) {
     case WSAECONNREFUSED:
@@ -78,7 +78,7 @@ std::string getDetailedErrorDescription(int errorCode) {
       return getLastErrorString();
   }
 #else
-  switch (errorCode) {
+  switch (error_code) {
     case ECONNREFUSED:
       return "Connection refused (目标端口主动拒绝连接)";
     case ETIMEDOUT:
@@ -100,12 +100,12 @@ std::string getDetailedErrorDescription(int errorCode) {
     case EPERM:
       return "Operation not permitted (操作不被允许)";
     default:
-      return strerror(errorCode);
+      return strerror(error_code);
   }
 #endif
 }
 
-std::string getConnectionStateString(ConnectionState state) {
+auto getConnectionStateString(ConnectionState state) -> std::string {
   switch (state) {
     case ConnectionState::Success:
       return "Success";

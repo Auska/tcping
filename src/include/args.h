@@ -6,8 +6,8 @@
 
 class ArgumentParser {
 public:
-  static bool parseArguments(int argc, char* argv[], Config& config);
-  static void printUsage(const char* programName);
+  static auto parseArguments(int argc, char* argv[], Config& config) -> bool;
+  static void printUsage(const char* program_name);
 };
 
 #endif // TCPING_ARGS_H

@@ -10,7 +10,7 @@
 #include <mutex>
 #include <queue>
 
-std::sig_atomic_t keep_running(true);
+std::sig_atomic_t keep_running(1);
 
 #ifdef _WIN32
 class WinSockInitializer {
@@ -36,12 +36,12 @@ class ThreadPool {
 public:
   explicit ThreadPool(size_t threads) : stop_(false) {
     for (size_t i = 0; i < threads; ++i) {
-      workers_.emplace_back([this] {
+      workers_.emplace_back([this] -> void {
         while (true) {
           std::function<void()> task;
           {
             std::unique_lock<std::mutex> lock(this->queue_mutex_);
-            this->condition_.wait(lock, [this] {
+            this->condition_.wait(lock, [this] -> bool {
               return this->stop_.load() || !this->tasks_.empty();
             });
             if (this->stop_.load() && this->tasks_.empty()) {
@@ -67,7 +67,7 @@ public:
       if (stop_.load()) {
         throw std::runtime_error("enqueue on stopped ThreadPool");
       }
-      tasks_.emplace([task]() { (*task)(); });
+      tasks_.emplace([task]() -> auto { (*task)(); });
     }
     condition_.notify_one();
     return res;
@@ -89,7 +89,7 @@ private:
   std::atomic<bool> stop_;
 };
 
-int main(int argc, char* argv[]) {
+auto main(int argc, char* argv[]) -> int {
   Config config;
 
   if (!ArgumentParser::parseArguments(argc, argv, config)) {
@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
 
   printStartupInfo(config);
 
-  PortStatistics portStats;
+  PortStatistics port_stats;
   std::mutex stats_mutex;
   std::mutex output_mutex;
 
@@ -110,14 +110,14 @@ int main(int argc, char* argv[]) {
   std::vector<std::future<void>> futures;
 
   int attempt_count = 0;
-  while (keep_running) {
+  while (keep_running != 0) {
     if (config.count > 0 && attempt_count >= config.count) {
       break;
     }
 
     // Check all hosts and ports in parallel
     for (const std::string& current_host : config.hosts) {
-      if (!keep_running) {
+      if (keep_running == 0) {
         break;
       }
 
@@ -126,13 +126,13 @@ int main(int argc, char* argv[]) {
 
       // Check all ports in parallel
       for (int port : config.ports) {
-        if (!keep_running) {
+        if (keep_running == 0) {
           break;
         }
 
         futures.push_back(pool.enqueue([&config, current_host, port,
-                                        resolved_ip, &portStats, &stats_mutex,
-                                        &output_mutex]() {
+                                        resolved_ip, &port_stats, &stats_mutex,
+                                        &output_mutex]() -> void {
           Tcping tcping(current_host, port, resolved_ip, config.ipv6);
 
           double connection_time = -1.0;
@@ -142,15 +142,15 @@ int main(int argc, char* argv[]) {
               config.timeout, &connection_time, &error_msg, &connection_state);
 
           {
-            std::lock_guard<std::mutex> lock(stats_mutex);
-            portStats.recordHostAttempt(current_host, port, success,
+            std::scoped_lock lock(stats_mutex);
+            port_stats.recordHostAttempt(current_host, port, success,
                                         connection_time, connection_state);
           }
 
           std::string timestamp = getCurrentTimestamp();
           std::string resolved_host = tcping.getResolvedHost();
           {
-            std::lock_guard<std::mutex> lock(output_mutex);
+            std::scoped_lock lock(output_mutex);
             printConnectionResult(timestamp, current_host, port, success,
                                   connection_time, error_msg, resolved_host,
                                   config.verbose);
@@ -167,17 +167,17 @@ int main(int argc, char* argv[]) {
 
     attempt_count++;
 
-    if (keep_running && (config.count == 0 || attempt_count < config.count)) {
+    if ((keep_running != 0) && (config.count == 0 || attempt_count < config.count)) {
       std::this_thread::sleep_for(std::chrono::seconds(config.interval));
     }
   }
 
-  std::cout << "\nMonitoring stopped." << std::endl;
+  std::cout << "\nMonitoring stopped." << '\n';
   std::cout.flush();
 
   // Only show statistics when scanning multiple hosts or ports
   if (config.hosts.size() > 1 || config.ports.size() > 1) {
-    portStats.printSummary(config.show_all);
+    port_stats.printSummary(config.show_all);
   }
 
   return 0;

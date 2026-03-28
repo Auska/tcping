@@ -37,8 +37,8 @@ struct Statistics {
   int dns_failure_count = 0;
 
   void recordAttempt(bool success, double time_ms, ConnectionState state);
-  double getAverageTime() const;
-  double getSuccessRate() const;
+  [[nodiscard]] auto getAverageTime() const -> double;
+  [[nodiscard]] auto getSuccessRate() const -> double;
 };
 
 struct PortStatistics {

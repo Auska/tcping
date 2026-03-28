@@ -2,9 +2,6 @@
 # clang-tidy 配置文件
 # 基于 C++23 标准和现代最佳实践
 
-Language: Cpp
-Standard: c++23
-
 # 启用的检查组
 Checks: >
   -*,
@@ -31,7 +28,7 @@ Checks: >
 WarningsAsErrors: ''
 
 # 头文件过滤
-HeaderFilterRegex: '.*'
+HeaderFilterRegex: 'src/include/.*'
 
 # 检查选项
 CheckOptions:

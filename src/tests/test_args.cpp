@@ -4,12 +4,12 @@
 
 // Forward declarations from args.cpp
 namespace {
-bool parsePorts(const char* portStr, std::vector<int>& ports);
-bool parseInterval(const char* intervalStr, int& interval);
-bool parseTimeout(const char* timeoutStr, int& timeout);
-bool parseCount(const char* countStr, int& count);
-bool parseConcurrency(const char* concurrencyStr, int& concurrency);
-bool parseHost(const char* hostStr, std::vector<std::string>& hosts);
+auto parsePorts(const char* port_str, std::vector<int>& ports) -> bool;
+auto parseInterval(const char* interval_str, int& interval) -> bool;
+auto parseTimeout(const char* timeout_str, int& timeout) -> bool;
+auto parseCount(const char* count_str, int& count) -> bool;
+auto parseConcurrency(const char* concurrency_str, int& concurrency) -> bool;
+auto parseHost(const char* host_str, std::vector<std::string>& hosts) -> bool;
 } // namespace
 
 // We need to test the internal functions, so we include the args.cpp

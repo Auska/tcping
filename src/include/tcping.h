@@ -9,22 +9,22 @@
 class Tcping {
 public:
   Tcping(const std::string& host, int port, bool ipv6 = false);
-  Tcping(const std::string& host, int port, const std::string& resolved_ip,
+  Tcping(std::string  host, int port, const std::string& resolved_ip,
          bool ipv6 = false);
-  bool checkConnection(int timeout_ms = 3000,
+  auto checkConnection(int timeout_ms = 3000,
                        double* connection_time_ms = nullptr,
                        std::string* error_msg = nullptr,
-                       ConnectionState* connection_state = nullptr);
-  std::string getResolvedHost() const;
+                       ConnectionState* connection_state = nullptr) -> bool;
+  [[nodiscard]] auto getResolvedHost() const -> std::string;
 
 private:
-  bool resolveAndCache(const std::string& target);
+  auto resolveAndCache(const std::string& target) -> bool;
   std::string host_;
   int port_;
   std::string resolved_host_;
   bool ipv6_ = false;
   bool cached_ = false;
-  struct sockaddr_storage cached_addr_;
+  struct sockaddr_storage cached_addr_{};
   socklen_t cached_addrlen_ = 0;
   int cached_family_ = 0;
 };
@@ -32,9 +32,9 @@ private:
 void printStartupInfo(const Config& config);
 void printConnectionResult(const std::string& timestamp,
                            const std::string& host, int port, bool success,
-                           double connectionTime, const std::string& errorMsg,
-                           const std::string& resolvedHost, bool verbose);
-std::string getCurrentTimestamp();
-std::string resolveHost(const std::string& host, bool ipv6);
+                           double connection_time, const std::string& error_msg,
+                           const std::string& resolved_host, bool verbose);
+auto getCurrentTimestamp() -> std::string;
+auto resolveHost(const std::string& host, bool ipv6) -> std::string;
 
 #endif // TCPING_TCPING_H

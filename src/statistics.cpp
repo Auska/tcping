@@ -1,4 +1,5 @@
 #include "statistics.h"
+#include <algorithm>
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -24,26 +25,29 @@ void printStatsEntry(const std::string& label, const Statistics& stats,
       first = false;
     }
     if (stats.refused_count > 0) {
-      if (!first)
+      if (!first) {
         std::cout << ", ";
+}
       std::cout << "refused=" << stats.refused_count;
       first = false;
     }
     if (stats.unreachable_count > 0) {
-      if (!first)
+      if (!first) {
         std::cout << ", ";
+}
       std::cout << "unreachable=" << stats.unreachable_count;
       first = false;
     }
     if (stats.dns_failure_count > 0) {
-      if (!first)
+      if (!first) {
         std::cout << ", ";
+}
       std::cout << "dns=" << stats.dns_failure_count;
     }
     std::cout << "]";
   }
 
-  std::cout << std::endl;
+  std::cout << '\n';
 }
 } // namespace
 
@@ -53,10 +57,8 @@ void Statistics::recordAttempt(bool success, double time_ms,
   if (success) {
     successful_connections++;
     total_time += time_ms;
-    if (time_ms < min_time)
-      min_time = time_ms;
-    if (time_ms > max_time)
-      max_time = time_ms;
+    min_time = std::min(time_ms, min_time);
+    max_time = std::max(time_ms, max_time);
   } else {
     failed_connections++;
     switch (state) {
@@ -78,11 +80,11 @@ void Statistics::recordAttempt(bool success, double time_ms,
   }
 }
 
-double Statistics::getAverageTime() const {
+auto Statistics::getAverageTime() const -> double {
   return successful_connections > 0 ? total_time / successful_connections : 0;
 }
 
-double Statistics::getSuccessRate() const {
+auto Statistics::getSuccessRate() const -> double {
   return total_attempts > 0 ? (successful_connections * 100.0) / total_attempts
                             : 0;
 }
@@ -126,24 +128,24 @@ void PortStatistics::printSummary(bool show_all) const {
   }
 
   if (!host_stats.empty()) {
-    std::cout << "\n--- Host Statistics ---" << std::endl;
+    std::cout << "\n--- Host Statistics ---" << '\n';
     for (const auto& [host, stats] : host_stats) {
       if (!show_all && stats.successful_connections == 0) {
         continue;
       }
       printStatsEntry("host " + host, stats, show_all);
     }
-    std::cout << "-----------------------\n" << std::endl;
+    std::cout << "-----------------------\n" << '\n';
   }
 
   if (!port_stats.empty()) {
-    std::cout << "\n--- Port Statistics ---" << std::endl;
+    std::cout << "\n--- Port Statistics ---" << '\n';
     for (const auto& [port, stats] : port_stats) {
       if (!show_all && stats.successful_connections == 0) {
         continue;
       }
       printStatsEntry("port " + std::to_string(port), stats, show_all);
     }
-    std::cout << "-----------------------\n" << std::endl;
+    std::cout << "-----------------------\n" << '\n';
   }
 }

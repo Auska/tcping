@@ -17,7 +17,7 @@ TEST_CASE("Tcping - constructor and basic operations", "[tcping]") {
   }
 
   SECTION("Constructor with pre-resolved IP") {
-    Tcping tcping("localhost", 80, "127.0.0.1");
+    Tcping tcping("localhost", 80, true);
     // The resolved IP should be the one we passed in
     // (it will try to resolve it, but we verify it got set)
     REQUIRE_FALSE(tcping.getResolvedHost().empty());

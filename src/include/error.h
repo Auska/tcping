@@ -10,9 +10,9 @@
 #  include <cerrno>
 #endif
 
-ConnectionState getConnectionState(int errorCode);
-std::string getDetailedErrorDescription(int errorCode);
-std::string getConnectionStateString(ConnectionState state);
+auto getConnectionState(int error_code) -> ConnectionState;
+auto getDetailedErrorDescription(int error_code) -> std::string;
+auto getConnectionStateString(ConnectionState state) -> std::string;
 
 #ifdef _WIN32
 std::string getLastErrorString();

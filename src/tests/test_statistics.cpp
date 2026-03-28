@@ -150,44 +150,44 @@ TEST_CASE("Statistics - getSuccessRate", "[statistics]") {
 }
 
 TEST_CASE("PortStatistics - recordHostAttempt", "[statistics]") {
-  PortStatistics portStats;
+  PortStatistics port_stats;
 
   SECTION("Record single attempt") {
-    portStats.recordHostAttempt("127.0.0.1", 80, true, 10.0,
+    port_stats.recordHostAttempt("127.0.0.1", 80, true, 10.0,
                                 ConnectionState::Success);
 
-    REQUIRE(portStats.host_stats.size() == 1);
-    REQUIRE(portStats.port_stats.size() == 1);
-    REQUIRE(portStats.host_stats["127.0.0.1"].successful_connections == 1);
-    REQUIRE(portStats.port_stats[80].successful_connections == 1);
+    REQUIRE(port_stats.host_stats.size() == 1);
+    REQUIRE(port_stats.port_stats.size() == 1);
+    REQUIRE(port_stats.host_stats["127.0.0.1"].successful_connections == 1);
+    REQUIRE(port_stats.port_stats[80].successful_connections == 1);
   }
 
   SECTION("Record multiple hosts same port") {
-    portStats.recordHostAttempt("192.168.1.1", 80, true, 10.0,
+    port_stats.recordHostAttempt("192.168.1.1", 80, true, 10.0,
                                 ConnectionState::Success);
-    portStats.recordHostAttempt("192.168.1.2", 80, true, 15.0,
+    port_stats.recordHostAttempt("192.168.1.2", 80, true, 15.0,
                                 ConnectionState::Success);
-    portStats.recordHostAttempt("192.168.1.3", 80, false, -1.0,
+    port_stats.recordHostAttempt("192.168.1.3", 80, false, -1.0,
                                 ConnectionState::Timeout);
 
-    REQUIRE(portStats.host_stats.size() == 3);
-    REQUIRE(portStats.port_stats.size() == 1);
-    REQUIRE(portStats.port_stats[80].total_attempts == 3);
-    REQUIRE(portStats.port_stats[80].successful_connections == 2);
+    REQUIRE(port_stats.host_stats.size() == 3);
+    REQUIRE(port_stats.port_stats.size() == 1);
+    REQUIRE(port_stats.port_stats[80].total_attempts == 3);
+    REQUIRE(port_stats.port_stats[80].successful_connections == 2);
   }
 
   SECTION("Record same host multiple ports") {
-    portStats.recordHostAttempt("127.0.0.1", 80, true, 10.0,
+    port_stats.recordHostAttempt("127.0.0.1", 80, true, 10.0,
                                 ConnectionState::Success);
-    portStats.recordHostAttempt("127.0.0.1", 443, true, 15.0,
+    port_stats.recordHostAttempt("127.0.0.1", 443, true, 15.0,
                                 ConnectionState::Success);
-    portStats.recordHostAttempt("127.0.0.1", 22, false, -1.0,
+    port_stats.recordHostAttempt("127.0.0.1", 22, false, -1.0,
                                 ConnectionState::Refused);
 
-    REQUIRE(portStats.host_stats.size() == 1);
-    REQUIRE(portStats.port_stats.size() == 3);
-    REQUIRE(portStats.host_stats["127.0.0.1"].total_attempts == 3);
-    REQUIRE(portStats.host_stats["127.0.0.1"].successful_connections == 2);
+    REQUIRE(port_stats.host_stats.size() == 1);
+    REQUIRE(port_stats.port_stats.size() == 3);
+    REQUIRE(port_stats.host_stats["127.0.0.1"].total_attempts == 3);
+    REQUIRE(port_stats.host_stats["127.0.0.1"].successful_connections == 2);
   }
 }
 

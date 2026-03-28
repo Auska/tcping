@@ -1,3 +1,7 @@
+#include <cstddef>
+
+#include <utility>
+
 #include "include/common.h"
 
 #include "include/error.h"
@@ -32,8 +36,8 @@ public:
       close(sock_);
     }
   }
-  int get() const { return sock_; }
-  int release() {
+  [[nodiscard]] auto get() const -> int { return sock_; }
+  auto release() -> int {
     int s = sock_;
     sock_ = -1;
     return s;
@@ -45,9 +49,9 @@ private:
 #endif
 
 namespace {
-std::string addrinfoToIPString(struct addrinfo* result) {
+auto addrinfoToIPString(struct addrinfo* result) -> std::string {
   char ipstr[INET6_ADDRSTRLEN];
-  void* addr;
+  void* addr = nullptr;
 
   if (result->ai_family == AF_INET) {
     auto* ipv4 = reinterpret_cast<struct sockaddr_in*>(result->ai_addr);
@@ -62,8 +66,9 @@ std::string addrinfoToIPString(struct addrinfo* result) {
 }
 } // namespace
 
-bool Tcping::resolveAndCache(const std::string& target) {
-  struct addrinfo hints{}, *result;
+auto Tcping::resolveAndCache(const std::string& target) -> bool {
+  struct addrinfo hints{};
+  struct addrinfo *result = nullptr;
   hints.ai_family = ipv6_ ? AF_INET6 : AF_INET;
   hints.ai_socktype = SOCK_STREAM;
 
@@ -91,22 +96,24 @@ Tcping::Tcping(const std::string& host, int port, bool ipv6)
   }
 }
 
-Tcping::Tcping(const std::string& host, int port,
+Tcping::Tcping(std::string  host, int port,
                const std::string& resolved_ip, bool ipv6)
-    : host_(host), port_(port), resolved_host_(resolved_ip), ipv6_(ipv6) {
+    : host_(std::move(host)), port_(port), resolved_host_(resolved_ip), ipv6_(ipv6) {
   resolveAndCache(resolved_ip);
 }
 
-bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
+auto Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
                              std::string* error_msg,
-                             ConnectionState* connection_state) {
+                             ConnectionState* connection_state) -> bool {
   auto start_time = std::chrono::high_resolution_clock::now();
 
   if (!cached_) {
-    if (error_msg)
+    if (error_msg != nullptr) {
       *error_msg = "DNS resolution failed";
-    if (connection_state)
+}
+    if (connection_state != nullptr) {
       *connection_state = ConnectionState::DnsFailure;
+}
     return false;
   }
 
@@ -122,10 +129,12 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
 #else
   int sockfd = socket(cached_family_, SOCK_STREAM, 0);
   if (sockfd < 0) {
-    if (error_msg)
+    if (error_msg != nullptr) {
       *error_msg = "Failed to create socket";
-    if (connection_state)
+}
+    if (connection_state != nullptr) {
       *connection_state = ConnectionState::Unknown;
+}
     return false;
   }
 #endif
@@ -147,10 +156,12 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
     double elapsed =
         std::chrono::duration<double, std::milli>(end_time - start_time)
             .count();
-    if (connection_time_ms)
+    if (connection_time_ms != nullptr) {
       *connection_time_ms = elapsed;
-    if (connection_state)
+}
+    if (connection_state != nullptr) {
       *connection_state = ConnectionState::Success;
+}
     return true;
   }
 
@@ -166,10 +177,12 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
 #else
   if (errno != EINPROGRESS) {
     int error_code = errno;
-    if (error_msg)
+    if (error_msg != nullptr) {
       *error_msg = getDetailedErrorDescription(error_code);
-    if (connection_state)
+}
+    if (connection_state != nullptr) {
       *connection_state = getConnectionState(error_code);
+}
     return false;
   }
 #endif
@@ -178,9 +191,9 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
   FD_ZERO(&write_fds);
   FD_SET(sockfd, &write_fds);
 
-  struct timeval tv;
+  struct timeval tv{};
   tv.tv_sec = timeout_ms / 1000;
-  tv.tv_usec = (timeout_ms % 1000) * 1000;
+  tv.tv_usec = static_cast<__suseconds_t>((timeout_ms % 1000) * 1000);
 
   ret = select(
 #ifdef _WIN32
@@ -191,10 +204,12 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
       nullptr, &write_fds, nullptr, &tv);
 
   if (ret <= 0) {
-    if (error_msg)
+    if (error_msg != nullptr) {
       *error_msg = "Connection timed out";
-    if (connection_state)
+}
+    if (connection_state != nullptr) {
       *connection_state = ConnectionState::Timeout;
+}
     return false;
   }
 
@@ -206,43 +221,49 @@ bool Tcping::checkConnection(int timeout_ms, double* connection_time_ms,
 #else
     int sys_err = errno;
 #endif
-    if (error_msg)
+    if (error_msg != nullptr) {
       *error_msg = getDetailedErrorDescription(sys_err);
-    if (connection_state)
+}
+    if (connection_state != nullptr) {
       *connection_state = getConnectionState(sys_err);
+}
     return false;
   }
 
   if (error != 0) {
-    if (error_msg)
+    if (error_msg != nullptr) {
       *error_msg = getDetailedErrorDescription(error);
-    if (connection_state)
+}
+    if (connection_state != nullptr) {
       *connection_state = getConnectionState(error);
+}
     return false;
   }
 
   auto end_time = std::chrono::high_resolution_clock::now();
   double elapsed =
       std::chrono::duration<double, std::milli>(end_time - start_time).count();
-  if (connection_time_ms)
+  if (connection_time_ms != nullptr) {
     *connection_time_ms = elapsed;
-  if (connection_state)
+}
+  if (connection_state != nullptr) {
     *connection_state = ConnectionState::Success;
+}
   return true;
 }
 
-std::string Tcping::getResolvedHost() const {
+auto Tcping::getResolvedHost() const -> std::string {
   return resolved_host_;
 }
 
-std::string getCurrentTimestamp() {
+auto getCurrentTimestamp() -> std::string {
   auto now = std::chrono::system_clock::now();
   auto time_t_now = std::chrono::system_clock::to_time_t(now);
   auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                 now.time_since_epoch()) %
             1000;
 
-  std::tm tm_now;
+  std::tm tm_now{};
 #ifdef _WIN32
   localtime_s(&tm_now, &time_t_now);
 #else
@@ -255,8 +276,9 @@ std::string getCurrentTimestamp() {
   return oss.str();
 }
 
-std::string resolveHost(const std::string& host, bool ipv6) {
-  struct addrinfo hints{}, *result;
+auto resolveHost(const std::string& host, bool ipv6) -> std::string {
+  struct addrinfo hints{};
+  struct addrinfo *result = nullptr;
   hints.ai_family = ipv6 ? AF_INET6 : AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
 
@@ -271,7 +293,7 @@ std::string resolveHost(const std::string& host, bool ipv6) {
 }
 
 void printStartupInfo(const Config& config) {
-  std::cout << "TCPing v" << VERSION << " by " << AUTHOR << std::endl;
+  std::cout << "TCPing v" << VERSION << " by " << AUTHOR << '\n';
 
   std::string host_display = config.host;
   if (config.hosts.size() > 1) {
@@ -285,28 +307,28 @@ void printStartupInfo(const Config& config) {
   if (config.ipv6) {
     std::cout << " (IPv6)";
   }
-  std::cout << ". Press Ctrl+C to stop." << std::endl;
+  std::cout << ". Press Ctrl+C to stop." << '\n';
 }
 
 void printConnectionResult(const std::string& timestamp,
                            const std::string& host, int port, bool success,
-                           double connectionTime, const std::string& errorMsg,
-                           const std::string& resolvedHost, bool verbose) {
+                           double connection_time, const std::string& error_msg,
+                           const std::string& resolved_host, bool verbose) {
   std::cout << "[" << timestamp << "] " << host << ":" << port;
 
-  if (resolvedHost != host) {
-    std::cout << " (" << resolvedHost << ")";
+  if (resolved_host != host) {
+    std::cout << " (" << resolved_host << ")";
   }
 
   if (success) {
     std::cout << " - Connected (time=" << std::fixed << std::setprecision(0)
-              << connectionTime << "ms)";
+              << connection_time << "ms)";
   } else {
     std::cout << " - Connection failed";
-    if (verbose && !errorMsg.empty()) {
-      std::cout << ": " << errorMsg;
+    if (verbose && !error_msg.empty()) {
+      std::cout << ": " << error_msg;
     }
   }
 
-  std::cout << std::endl;
+  std::cout << '\n';
 }

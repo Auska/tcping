@@ -9,15 +9,15 @@
 
 // Forward declarations for helper functions
 namespace {
-bool parsePorts(const char* portStr, std::vector<int>& ports);
-bool parseInterval(const char* intervalStr, int& interval);
-bool parseTimeout(const char* timeoutStr, int& timeout);
-bool parseCount(const char* countStr, int& count);
-bool parseConcurrency(const char* concurrencyStr, int& concurrency);
-bool parseHost(const char* hostStr, std::vector<std::string>& hosts);
+auto parsePorts(const char* port_str, std::vector<int>& ports) -> bool;
+auto parseInterval(const char* interval_str, int& interval) -> bool;
+auto parseTimeout(const char* timeout_str, int& timeout) -> bool;
+auto parseCount(const char* count_str, int& count) -> bool;
+auto parseConcurrency(const char* concurrency_str, int& concurrency) -> bool;
+auto parseHost(const char* host_str, std::vector<std::string>& hosts) -> bool;
 } // namespace
 
-bool ArgumentParser::parseArguments(int argc, char* argv[], Config& config) {
+auto ArgumentParser::parseArguments(int argc, char* argv[], Config& config) -> bool {
   if (argc < 3) {
     printUsage(argv[0]);
     return false;
@@ -60,7 +60,7 @@ bool ArgumentParser::parseArguments(int argc, char* argv[], Config& config) {
         return false;
       }
     } else {
-      std::cerr << "Unknown option: " << arg << std::endl;
+      std::cerr << "Unknown option: " << arg << '\n';
       printUsage(argv[0]);
       return false;
     }
@@ -69,86 +69,86 @@ bool ArgumentParser::parseArguments(int argc, char* argv[], Config& config) {
   return true;
 }
 
-void ArgumentParser::printUsage(const char* programName) {
-  std::cout << "TCPing v" << VERSION << " by " << AUTHOR << std::endl;
-  std::cerr << "Usage: " << programName << " <host> <port> [options]"
-            << std::endl;
-  std::cerr << std::endl;
-  std::cerr << "Arguments:" << std::endl;
+void ArgumentParser::printUsage(const char* program_name) {
+  std::cout << "TCPing v" << VERSION << " by " << AUTHOR << '\n';
+  std::cerr << "Usage: " << program_name << " <host> <port> [options]"
+            << '\n';
+  std::cerr << '\n';
+  std::cerr << "Arguments:" << '\n';
   std::cerr << "  <host>        Target host (IP address or domain name)"
-            << std::endl;
+            << '\n';
   std::cerr << "  <port>        Target port(s): single port (80), multiple "
                "(22,80), or range (100-200)"
-            << std::endl;
-  std::cerr << std::endl;
-  std::cerr << "Options:" << std::endl;
+            << '\n';
+  std::cerr << '\n';
+  std::cerr << "Options:" << '\n';
   std::cerr
       << "  -i <seconds>  Wait interval between checks in seconds (default: 1)"
-      << std::endl;
+      << '\n';
   std::cerr
       << "  -t <ms>       Connection timeout in milliseconds (default: 3000)"
-      << std::endl;
+      << '\n';
   std::cerr << "  -v            Verbose mode (show detailed error messages)"
-            << std::endl;
+            << '\n';
   std::cerr
       << "  -c <count>    Number of connection attempts (default: unlimited)"
-      << std::endl;
+      << '\n';
   std::cerr
       << "  -a            Show all statistics (default: only show open ports)"
-      << std::endl;
-  std::cerr << "  -4            Force IPv4 mode (default)" << std::endl;
-  std::cerr << "  -6            Force IPv6 mode" << std::endl;
+      << '\n';
+  std::cerr << "  -4            Force IPv4 mode (default)" << '\n';
+  std::cerr << "  -6            Force IPv6 mode" << '\n';
   std::cerr << "  -j <num>      Max concurrent connections (default: 50)"
-            << std::endl;
-  std::cerr << std::endl;
-  std::cerr << "Notes:" << std::endl;
+            << '\n';
+  std::cerr << '\n';
+  std::cerr << "Notes:" << '\n';
   std::cerr
       << "  Statistics are automatically shown when scanning multiple hosts "
          "or ports"
-      << std::endl;
-  std::cerr << std::endl;
-  std::cerr << "Examples:" << std::endl;
-  std::cerr << "  " << programName << " google.com 443 -i 2 -t 5000"
-            << std::endl;
-  std::cerr << "  " << programName << " 127.0.0.1 22 -c 10" << std::endl;
-  std::cerr << "  " << programName << " ipv6.google.com 443 -6" << std::endl;
-  std::cerr << "  " << programName << " ::1 22 -6" << std::endl;
+      << '\n';
+  std::cerr << '\n';
+  std::cerr << "Examples:" << '\n';
+  std::cerr << "  " << program_name << " google.com 443 -i 2 -t 5000"
+            << '\n';
+  std::cerr << "  " << program_name << " 127.0.0.1 22 -c 10" << '\n';
+  std::cerr << "  " << program_name << " ipv6.google.com 443 -6" << '\n';
+  std::cerr << "  " << program_name << " ::1 22 -6" << '\n';
 }
 
 namespace {
-bool parsePorts(const char* portStr, std::vector<int>& ports) {
-  std::string str(portStr);
+auto parsePorts(const char* port_str, std::vector<int>& ports) -> bool {
+  std::string str(port_str);
   std::stringstream ss(str);
   std::string token;
 
   while (std::getline(ss, token, ',')) {
     // Check if it's a range (e.g., "100-200")
-    size_t dashPos = token.find('-');
-    if (dashPos != std::string::npos) {
-      std::string startStr = token.substr(0, dashPos);
-      std::string endStr = token.substr(dashPos + 1);
+    size_t dash_pos = token.find('-');
+    if (dash_pos != std::string::npos) {
+      std::string start_str = token.substr(0, dash_pos);
+      std::string end_str = token.substr(dash_pos + 1);
 
       try {
-        int startPort = std::stoi(startStr);
-        int endPort = std::stoi(endStr);
+        int start_port = std::stoi(start_str);
+        int end_port = std::stoi(end_str);
 
-        if (startPort <= 0 || startPort > 65535 || endPort <= 0 ||
-            endPort > 65535) {
-          std::cerr << "Port must be between 1 and 65535" << std::endl;
+        if (start_port <= 0 || start_port > 65535 || end_port <= 0 ||
+            end_port > 65535) {
+          std::cerr << "Port must be between 1 and 65535" << '\n';
           return false;
         }
 
-        if (startPort > endPort) {
-          std::cerr << "Invalid port range: " << startPort << "-" << endPort
-                    << std::endl;
+        if (start_port > end_port) {
+          std::cerr << "Invalid port range: " << start_port << "-" << end_port
+                    << '\n';
           return false;
         }
 
-        for (int p = startPort; p <= endPort; p++) {
+        for (int p = start_port; p <= end_port; p++) {
           ports.push_back(p);
         }
       } catch (const std::exception& /* e */) {
-        std::cerr << "Invalid port range: " << token << std::endl;
+        std::cerr << "Invalid port range: " << token << '\n';
         return false;
       }
     } else {
@@ -156,195 +156,195 @@ bool parsePorts(const char* portStr, std::vector<int>& ports) {
       try {
         int port = std::stoi(token);
         if (port <= 0 || port > 65535) {
-          std::cerr << "Port must be between 1 and 65535" << std::endl;
+          std::cerr << "Port must be between 1 and 65535" << '\n';
           return false;
         }
         ports.push_back(port);
       } catch (const std::exception& /* e */) {
-        std::cerr << "Invalid port number: " << token << std::endl;
+        std::cerr << "Invalid port number: " << token << '\n';
         return false;
       }
     }
   }
 
   if (ports.empty()) {
-    std::cerr << "At least one port must be specified" << std::endl;
+    std::cerr << "At least one port must be specified" << '\n';
     return false;
   }
 
   return true;
 }
 
-bool parseInterval(const char* intervalStr, int& interval) {
+auto parseInterval(const char* interval_str, int& interval) -> bool {
   try {
-    interval = std::stoi(intervalStr);
+    interval = std::stoi(interval_str);
     if (interval <= 0) {
-      std::cerr << "Interval must be positive" << std::endl;
+      std::cerr << "Interval must be positive" << '\n';
       return false;
     }
   } catch (const std::exception& /* e */) {
-    std::cerr << "Invalid interval value: " << intervalStr << std::endl;
+    std::cerr << "Invalid interval value: " << interval_str << '\n';
     return false;
   }
   return true;
 }
 
-bool parseTimeout(const char* timeoutStr, int& timeout) {
+auto parseTimeout(const char* timeout_str, int& timeout) -> bool {
   try {
-    timeout = std::stoi(timeoutStr);
+    timeout = std::stoi(timeout_str);
     if (timeout <= 0) {
-      std::cerr << "Timeout must be positive" << std::endl;
+      std::cerr << "Timeout must be positive" << '\n';
       return false;
     }
   } catch (const std::exception& /* e */) {
-    std::cerr << "Invalid timeout value: " << timeoutStr << std::endl;
+    std::cerr << "Invalid timeout value: " << timeout_str << '\n';
     return false;
   }
   return true;
 }
 
-bool parseCount(const char* countStr, int& count) {
+auto parseCount(const char* count_str, int& count) -> bool {
   try {
-    count = std::stoi(countStr);
+    count = std::stoi(count_str);
     if (count < 0) {
-      std::cerr << "Count must be non-negative" << std::endl;
+      std::cerr << "Count must be non-negative" << '\n';
       return false;
     }
   } catch (const std::exception& /* e */) {
-    std::cerr << "Invalid count value: " << countStr << std::endl;
+    std::cerr << "Invalid count value: " << count_str << '\n';
     return false;
   }
   return true;
 }
 
-bool parseConcurrency(const char* concurrencyStr, int& concurrency) {
+auto parseConcurrency(const char* concurrency_str, int& concurrency) -> bool {
   try {
-    concurrency = std::stoi(concurrencyStr);
+    concurrency = std::stoi(concurrency_str);
     if (concurrency <= 0) {
-      std::cerr << "Concurrency must be positive" << std::endl;
+      std::cerr << "Concurrency must be positive" << '\n';
       return false;
     }
   } catch (const std::exception& /* e */) {
-    std::cerr << "Invalid concurrency value: " << concurrencyStr << std::endl;
+    std::cerr << "Invalid concurrency value: " << concurrency_str << '\n';
     return false;
   }
   return true;
 }
 
-bool parseHost(const char* hostStr, std::vector<std::string>& hosts) {
-  std::string str(hostStr);
+auto parseHost(const char* host_str, std::vector<std::string>& hosts) -> bool {
+  std::string str(host_str);
 
   // Check if it's a CIDR notation (e.g., 192.168.88.0/24)
-  size_t cidrPos = str.find('/');
-  if (cidrPos != std::string::npos) {
-    std::string ipPart = str.substr(0, cidrPos);
-    std::string prefixLenStr = str.substr(cidrPos + 1);
+  size_t cidr_pos = str.find('/');
+  if (cidr_pos != std::string::npos) {
+    std::string ip_part = str.substr(0, cidr_pos);
+    std::string prefix_len_str = str.substr(cidr_pos + 1);
 
     // Validate IP address
-    struct in_addr addr;
-    if (inet_pton(AF_INET, ipPart.c_str(), &addr) != 1) {
-      std::cerr << "Invalid IP address in CIDR: " << ipPart << std::endl;
+    struct in_addr addr{};
+    if (inet_pton(AF_INET, ip_part.c_str(), &addr) != 1) {
+      std::cerr << "Invalid IP address in CIDR: " << ip_part << '\n';
       return false;
     }
 
     // Parse prefix length
-    int prefixLen;
+    int prefix_len = 0;
     try {
-      prefixLen = std::stoi(prefixLenStr);
-      if (prefixLen < 0 || prefixLen > 32) {
-        std::cerr << "CIDR prefix must be between 0 and 32" << std::endl;
+      prefix_len = std::stoi(prefix_len_str);
+      if (prefix_len < 0 || prefix_len > 32) {
+        std::cerr << "CIDR prefix must be between 0 and 32" << '\n';
         return false;
       }
     } catch (const std::exception& /* e */) {
-      std::cerr << "Invalid CIDR prefix: " << prefixLenStr << std::endl;
+      std::cerr << "Invalid CIDR prefix: " << prefix_len_str << '\n';
       return false;
     }
 
     // Calculate IP range from CIDR
     uint32_t ip = ntohl(addr.s_addr);
-    uint32_t mask = prefixLen == 0 ? 0 : 0xFFFFFFFF << (32 - prefixLen);
+    uint32_t mask = prefix_len == 0 ? 0 : 0xFFFFFFFF << (32 - prefix_len);
     uint32_t network = ip & mask;
     uint32_t broadcast = network | (~mask);
 
     // Limit to reasonable range (max 65536 IPs)
     if (broadcast - network + 1 > 65536) {
-      std::cerr << "CIDR range too large (max 65536 IPs)" << std::endl;
+      std::cerr << "CIDR range too large (max 65536 IPs)" << '\n';
       return false;
     }
 
     for (uint32_t i = network; i <= broadcast; i++) {
-      struct in_addr tmp;
+      struct in_addr tmp{};
       tmp.s_addr = htonl(i);
-      char ipStr[INET_ADDRSTRLEN];
-      inet_ntop(AF_INET, &tmp, ipStr, sizeof(ipStr));
-      hosts.push_back(std::string(ipStr));
+      char ip_str[INET_ADDRSTRLEN];
+      inet_ntop(AF_INET, &tmp, ip_str, sizeof(ip_str));
+      hosts.emplace_back(ip_str);
     }
 
     return true;
   }
 
   // Check if it's a range (e.g., 192.168.88.100-200)
-  size_t dashPos = str.find('-');
-  if (dashPos != std::string::npos) {
-    std::string ipPart = str.substr(0, dashPos);
-    std::string endPart = str.substr(dashPos + 1);
+  size_t dash_pos = str.find('-');
+  if (dash_pos != std::string::npos) {
+    std::string ip_part = str.substr(0, dash_pos);
+    std::string end_part = str.substr(dash_pos + 1);
 
     // Validate base IP address
-    struct in_addr addr;
-    if (inet_pton(AF_INET, ipPart.c_str(), &addr) != 1) {
-      std::cerr << "Invalid IP address: " << ipPart << std::endl;
+    struct in_addr addr{};
+    if (inet_pton(AF_INET, ip_part.c_str(), &addr) != 1) {
+      std::cerr << "Invalid IP address: " << ip_part << '\n';
       return false;
     }
 
-    uint32_t baseIp = ntohl(addr.s_addr);
+    uint32_t base_ip = ntohl(addr.s_addr);
     // Get first 3 octets as base prefix
-    uint32_t basePrefix = (baseIp >> 8) & 0xFFFFFF; // First 3 octets
+    uint32_t base_prefix = (base_ip >> 8) & 0xFFFFFF; // First 3 octets
 
     // Parse end IP (could be full IP or just last octet)
-    uint32_t endIp;
-    if (endPart.find('.') != std::string::npos) {
+    uint32_t end_ip = 0;
+    if (end_part.find('.') != std::string::npos) {
       // Full IP address
-      struct in_addr endAddr;
-      if (inet_pton(AF_INET, endPart.c_str(), &endAddr) != 1) {
-        std::cerr << "Invalid end IP address: " << endPart << std::endl;
+      struct in_addr end_addr{};
+      if (inet_pton(AF_INET, end_part.c_str(), &end_addr) != 1) {
+        std::cerr << "Invalid end IP address: " << end_part << '\n';
         return false;
       }
-      endIp = ntohl(endAddr.s_addr);
+      end_ip = ntohl(end_addr.s_addr);
     } else {
       // Just last octet
       try {
-        int lastOctet = std::stoi(endPart);
-        if (lastOctet < 0 || lastOctet > 255) {
-          std::cerr << "Invalid last octet: " << lastOctet << std::endl;
+        int last_octet = std::stoi(end_part);
+        if (last_octet < 0 || last_octet > 255) {
+          std::cerr << "Invalid last octet: " << last_octet << '\n';
           return false;
         }
-        endIp = (basePrefix << 8) | (lastOctet & 0xFF);
+        end_ip = (base_prefix << 8) | (last_octet & 0xFF);
       } catch (const std::exception& /* e */) {
-        std::cerr << "Invalid IP range: " << str << std::endl;
+        std::cerr << "Invalid IP range: " << str << '\n';
         return false;
       }
     }
 
-    uint32_t startIp = baseIp;
+    uint32_t start_ip = base_ip;
 
     // Validate range
-    if (endIp < startIp) {
-      std::cerr << "Invalid IP range: start > end" << std::endl;
+    if (end_ip < start_ip) {
+      std::cerr << "Invalid IP range: start > end" << '\n';
       return false;
     }
 
     // Limit to reasonable range (max 65536 IPs)
-    if (endIp - startIp + 1 > 65536) {
-      std::cerr << "IP range too large (max 65536 IPs)" << std::endl;
+    if (end_ip - start_ip + 1 > 65536) {
+      std::cerr << "IP range too large (max 65536 IPs)" << '\n';
       return false;
     }
 
-    for (uint32_t i = startIp; i <= endIp; i++) {
-      struct in_addr tmp;
+    for (uint32_t i = start_ip; i <= end_ip; i++) {
+      struct in_addr tmp{};
       tmp.s_addr = htonl(i);
-      char ipStr[INET_ADDRSTRLEN];
-      inet_ntop(AF_INET, &tmp, ipStr, sizeof(ipStr));
-      hosts.push_back(std::string(ipStr));
+      char ip_str[INET_ADDRSTRLEN];
+      inet_ntop(AF_INET, &tmp, ip_str, sizeof(ip_str));
+      hosts.emplace_back(ip_str);
     }
 
     return true;

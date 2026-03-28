@@ -97,8 +97,9 @@ void PortStatistics::recordHostAttempt(const std::string& host, int port,
 void PortStatistics::printSummary(bool show_all) const {
   bool has_successful = false;
   bool has_any = false;
+
   for (const auto& [host, stats] : host_stats) {
-    (void)host;
+    (void)host; // Structured binding, host used for iteration
     if (stats.successful_connections > 0) {
       has_successful = true;
     }
@@ -106,8 +107,9 @@ void PortStatistics::printSummary(bool show_all) const {
       has_any = true;
     }
   }
+
   for (const auto& [port, stats] : port_stats) {
-    (void)port;
+    (void)port; // Structured binding, port used for iteration
     if (stats.successful_connections > 0) {
       has_successful = true;
     }
